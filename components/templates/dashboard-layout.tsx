@@ -15,7 +15,7 @@ interface DashboardLayoutProps {
 
 export const DashboardLayout = ({ children, role, userName, userAvatar }: DashboardLayoutProps) => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-cyan-50/30">
       <Sidebar role={role} userName={userName} userAvatar={userAvatar} />
       <BottomNavigation role={role} userName={userName} userAvatar={userAvatar} />
       <main className="md:ml-72 pb-28 md:pb-8 px-4 sm:px-6 py-6 md:py-8">

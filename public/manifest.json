@@ -1,11 +1,11 @@
 {
-  "name": "School Management System",
-  "short_name": "School Management",
-  "description": "Sistem manajemen sekolah modern untuk mengelola akademik, siswa, guru, dan administrasi sekolah",
+  "name": "Aegix SLE (Smart Learning Ecosystem)",
+  "short_name": "Aegix SLE",
+  "description": "Smart Learning Ecosystem untuk manajemen sekolah digital yang aman dan terintegrasi",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#3b82f6",
+  "background_color": "#f8fafc",
+  "theme_color": "#1d4ed8",
   "orientation": "portrait-primary",
   "icons": [
     {
@@ -19,6 +19,11 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
     }
   ],
   "categories": ["education", "productivity"],

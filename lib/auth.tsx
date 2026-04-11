@@ -1,9 +1,9 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, ReactNode } from "react"
 import { useRouter, usePathname } from "next/navigation"
-import type { UserRole, Student, Employee, User } from "./mock-data"
-import { mockStudents, mockEmployees, mockAdmins, mockSuperAdmins, mockParents, mockCanteenOwners } from "./mock-data"
+import type { UserRole } from "./mock-data"
+import { getAllAuthUsers } from "./auth-user-storage"
 
 // Auth user type combining all user types
 export interface AuthUser {
@@ -15,28 +15,11 @@ export interface AuthUser {
   password?: string
 }
 
-// Mock users with passwords for login
-export const mockAuthUsers: (AuthUser & { password: string })[] = [
-  // Students
-  ...mockStudents.map(s => ({ ...s, password: "student123" })),
-  // Employees
-  ...mockEmployees.map(e => ({ ...e, password: "guru123" })),
-  // Admins
-  ...mockAdmins.map(a => ({ ...a, password: "admin123" })),
-  // Super Admins
-  ...mockSuperAdmins.map(sa => ({ ...sa, password: "kepsek123" })),
-  // Parents
-  ...mockParents.map(p => ({ ...p, password: "parent123" })),
-  // Canteen Owners
-  ...mockCanteenOwners.map(co => ({ ...co, password: "canteen123" })),
-]
-
 interface AuthContextType {
   user: AuthUser | null
   isLoading: boolean
   isAuthenticated: boolean
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
-  register: (name: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>
   logout: () => void
   getRedirectPath: (role: UserRole) => string
 }
@@ -46,6 +29,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const lastRedirectRef = useRef<string | null>(null)
   const router = useRouter()
   const pathname = usePathname()
 
@@ -68,21 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuth()
   }, [])
 
-  // Redirect based on auth state
-  useEffect(() => {
-    if (isLoading) return
-
-    const publicPaths = ["/", "/login", "/register"]
-    const isPublicPath = publicPaths.includes(pathname)
-
-    if (!user && !isPublicPath) {
-      router.push("/")
-    } else if (user && isPublicPath) {
-      router.push(getRedirectPath(user.role))
-    }
-  }, [user, isLoading, pathname, router])
-
-  const getRedirectPath = (role: UserRole): string => {
+  const getRedirectPath = useCallback((role: UserRole): string => {
     switch (role) {
       case "STUDENT":
         return "/student"
@@ -99,13 +69,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       default:
         return "/login"
     }
-  }
+  }, [])
 
-  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 800))
+  // Redirect based on auth state
+  useEffect(() => {
+    if (isLoading) return
 
-    const foundUser = mockAuthUsers.find(
+    const publicPaths = ["/", "/login", "/register"]
+    const isPublicPath = publicPaths.includes(pathname)
+
+    if (!user && !isPublicPath) {
+      if (lastRedirectRef.current !== "/") {
+        lastRedirectRef.current = "/"
+        router.replace("/")
+      }
+    } else if (user && isPublicPath) {
+      const targetPath = getRedirectPath(user.role)
+      if (pathname !== targetPath && lastRedirectRef.current !== targetPath) {
+        lastRedirectRef.current = targetPath
+        router.replace(targetPath)
+      }
+    } else {
+      lastRedirectRef.current = null
+    }
+  }, [user, isLoading, pathname, router, getRedirectPath])
+
+  const login = useCallback(async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    // Keep a short delay for UX feedback without adding noticeable lag.
+    await new Promise(resolve => setTimeout(resolve, 200))
+
+    const foundUser = getAllAuthUsers().find(
       u => u.email.toLowerCase() === email.toLowerCase() && u.password === password
     )
 
@@ -119,54 +112,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("auth_user", JSON.stringify(userWithoutPassword))
 
     return { success: true }
-  }
+  }, [])
 
-  const register = async (name: string, email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 800))
-
-    // Check if email already exists
-    const existingUser = mockAuthUsers.find(
-      u => u.email.toLowerCase() === email.toLowerCase()
-    )
-
-    if (existingUser) {
-      return { success: false, error: "Email sudah terdaftar" }
-    }
-
-    // Create new student user (default role for registration)
-    const newUser: AuthUser = {
-      id: `student-${Date.now()}`,
-      name,
-      email,
-      avatar: "/placeholder-user.jpg",
-      role: "STUDENT",
-    }
-
-    setUser(newUser)
-    localStorage.setItem("auth_user", JSON.stringify(newUser))
-
-    return { success: true }
-  }
-
-  const logout = () => {
+  const logout = useCallback(() => {
     setUser(null)
     localStorage.removeItem("auth_user")
-    router.push("/")
-  }
+    router.replace("/")
+  }, [router])
+
+  const value = useMemo(
+    () => ({
+      user,
+      isLoading,
+      isAuthenticated: !!user,
+      login,
+      logout,
+      getRedirectPath,
+    }),
+    [user, isLoading, login, logout, getRedirectPath],
+  )
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        isAuthenticated: !!user,
-        login,
-        register,
-        logout,
-        getRedirectPath,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   )
@@ -191,11 +158,11 @@ export function withAuth<P extends object>(
 
     useEffect(() => {
       if (!isLoading && !isAuthenticated) {
-        router.push("/login")
+        router.replace("/login")
       } else if (!isLoading && user && allowedRoles && !allowedRoles.includes(user.role)) {
-        router.push("/unauthorized")
+        router.replace("/unauthorized")
       }
-    }, [isLoading, isAuthenticated, user, router])
+    }, [isLoading, isAuthenticated, user, router, allowedRoles])
 
     if (isLoading) {
       return (

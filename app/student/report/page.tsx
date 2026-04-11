@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
 import { GlassCard } from "@/components/molecules/glass-card"
 import { GlassModal } from "@/components/molecules/glass-modal"
@@ -66,6 +66,15 @@ export default function StudentReportPage() {
   const [showSuccess, setShowSuccess] = useState(false)
   const [reports, setReports] = useState(mockReports)
   const [selectedReport, setSelectedReport] = useState<typeof mockReports[0] | null>(null)
+  const successTimerRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (successTimerRef.current !== null) {
+        window.clearTimeout(successTimerRef.current)
+      }
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -90,7 +99,7 @@ export default function StudentReportPage() {
       location,
     }
 
-    setReports([newReport, ...reports])
+    setReports((prev) => [newReport, ...prev])
     setShowSuccess(true)
     setAssetId("")
     setDamageType("")
@@ -98,7 +107,13 @@ export default function StudentReportPage() {
     setLocation("")
     setIsSubmitting(false)
 
-    setTimeout(() => setShowSuccess(false), 3000)
+    if (successTimerRef.current !== null) {
+      window.clearTimeout(successTimerRef.current)
+    }
+    successTimerRef.current = window.setTimeout(() => {
+      setShowSuccess(false)
+      successTimerRef.current = null
+    }, 3000)
   }
 
   const getStatusBadge = (status: string) => {

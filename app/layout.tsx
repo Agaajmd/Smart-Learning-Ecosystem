@@ -16,112 +16,75 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://school-management.app'),
+  metadataBase: new URL("https://aegix-sle.app"),
   title: {
-    default: "School Management - Sistem Manajemen Sekolah Digital #1 Indonesia",
-    template: "%s | School Management"
+    default: "Aegix SLE",
+    template: "%s | Aegix SLE",
   },
-  description: "Sistem manajemen sekolah terbaik di Indonesia untuk mengelola akademik, siswa, guru, dan administrasi sekolah. Platform all-in-one dengan fitur e-learning, absensi digital, rapor online, dan laporan real-time. Gratis untuk 30 hari!",
-  keywords: [
-    "sistem manajemen sekolah",
-    "school management system",
-    "aplikasi sekolah indonesia",
-    "e-learning indonesia",
-    "absensi siswa online",
-    "rapor digital sekolah",
-    "manajemen akademik sekolah",
-    "sistem informasi sekolah",
-    "software sekolah terbaik",
-    "aplikasi pendidikan",
-    "SIS sekolah",
-    "learning management system",
-    "aplikasi guru",
-    "portal siswa online",
-    "administrasi sekolah digital"
-  ],
-  authors: [{ name: "School Management Team", url: "https://school-management.app" }],
-  creator: "School Management",
-  publisher: "School Management",
+  description: "Aegix SLE private application shell.",
+  authors: [{ name: "Aegix SLE Team" }],
+  creator: "Aegix SLE",
+  publisher: "Aegix SLE",
   category: "Education",
-  classification: "Education Management Software",
+  classification: "Smart Learning Ecosystem",
   openGraph: {
     type: "website",
     locale: "id_ID",
-    url: "https://school-management.app",
-    siteName: "School Management",
-    title: "School Management - Sistem Manajemen Sekolah Digital #1 Indonesia",
-    description: "Platform all-in-one untuk mengelola akademik, siswa, guru, dan administrasi sekolah dengan mudah dan efisien. Gratis 30 hari!",
+    url: "https://aegix-sle.app",
+    siteName: "Aegix SLE",
+    title: "Aegix SLE",
+    description: "Aegix SLE private application shell.",
     images: [
       {
-        url: "/og-image.png",
+        url: "/AegixLogo.png",
         width: 1200,
-        height: 630,
-        alt: "School Management System - Sistem Manajemen Sekolah Digital"
-      }
-    ]
+        height: 1200,
+        alt: "Aegix SLE Logo",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
-    site: "@schoolmanagement",
-    creator: "@schoolmanagement",
-    title: "School Management - Sistem Manajemen Sekolah Digital #1",
-    description: "Platform all-in-one untuk mengelola akademik, siswa, guru, dan administrasi sekolah.",
-    images: ["/og-image.png"]
+    title: "Aegix SLE",
+    description: "Smart Learning Ecosystem.",
+    images: ["/AegixLogo.png"],
   },
   robots: {
-    index: true,
-    follow: true,
-    nocache: false,
+    index: false,
+    follow: false,
+    nocache: true,
+    noarchive: true,
+    nosnippet: true,
     googleBot: {
-      index: true,
-      follow: true,
-      noimageindex: false,
-      "max-video-preview": -1,
-      "max-image-preview": "large",
-      "max-snippet": -1,
+      index: false,
+      follow: false,
+      noimageindex: true,
+      "max-video-preview": 0,
+      "max-image-preview": "none",
+      "max-snippet": 0,
     },
-  },
-  verification: {
-    google: "your-google-verification-code",
   },
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
-      {
-        url: "/icon-light-32x32.png",
-        media: "(prefers-color-scheme: light)",
-      },
-      {
-        url: "/icon-dark-32x32.png",
-        media: "(prefers-color-scheme: dark)",
-      },
-      {
-        url: "/icon.svg",
-        type: "image/svg+xml",
-      },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/icon-192x192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512x512.png", sizes: "512x512", type: "image/png" },
     ],
+    shortcut: ["/favicon.ico"],
     apple: [
-      { url: "/apple-icon.png" },
-      { url: "/apple-icon-180x180.png", sizes: "180x180", type: "image/png" },
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
     ],
   },
   manifest: "/manifest.json",
   alternates: {
-    canonical: "https://school-management.app",
-    languages: {
-      'id-ID': 'https://school-management.app',
-      'en-US': 'https://school-management.app/en',
-    },
-  },
-  other: {
-    "google-site-verification": "your-google-verification-code",
-    "msvalidate.01": "your-bing-verification-code",
-    "facebook-domain-verification": "your-facebook-verification-code",
+    canonical: "/",
   },
 }
 
 export const viewport: Viewport = {
-  themeColor: "#c4b5fd",
+  themeColor: "#1d4ed8",
   width: "device-width",
   initialScale: 1,
 }
@@ -131,33 +94,8 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    "name": "School Management",
-    "applicationCategory": "EducationalApplication",
-    "operatingSystem": "Web Browser",
-    "offers": {
-      "@type": "Offer",
-      "price": "0",
-      "priceCurrency": "IDR"
-    },
-    "aggregateRating": {
-      "@type": "AggregateRating",
-      "ratingValue": "4.9",
-      "ratingCount": "1250"
-    },
-    "description": "Sistem manajemen sekolah terbaik di Indonesia untuk mengelola akademik, siswa, guru, dan administrasi sekolah."
-  }
-
   return (
     <html lang="id">
-      <head>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
-      </head>
       <body
         className={`${plusJakartaSans.variable} ${geistMono.variable} font-sans antialiased min-h-screen liquid-glass-bg`}
         vaul-drawer-wrapper=""

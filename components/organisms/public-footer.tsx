@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { GraduationCap } from "lucide-react"
+import Image from "next/image"
 
 export function PublicFooter() {
   return (
@@ -9,13 +9,17 @@ export function PublicFooter() {
           {/* Brand */}
           <div className="md:col-span-2">
             <Link href="/" className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl">
-                <GraduationCap className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-xl font-bold text-white">EduGlass</span>
+              <Image
+                src="/AegixLogo.png"
+                alt="Aegix SLE Logo"
+                width={40}
+                height={40}
+                className="w-10 h-10 rounded-xl"
+              />
+              <span className="text-xl font-bold text-white">Aegix SLE</span>
             </Link>
             <p className="text-white/50 text-sm max-w-md">
-              Sistem manajemen sekolah modern dengan desain Liquid Glass yang elegan dan fitur lengkap untuk mengelola sekolah Anda.
+              Smart Learning Ecosystem modern dengan desain elegan dan fitur lengkap untuk ekosistem belajar sekolah Anda.
             </p>
           </div>
 
@@ -51,8 +55,8 @@ export function PublicFooter() {
                 </Link>
               </li>
               <li>
-                <Link href="/register" className="text-white/50 hover:text-white text-sm transition-colors">
-                  Daftar
+                <Link href="/login" className="text-white/50 hover:text-white text-sm transition-colors">
+                  Mulai
                 </Link>
               </li>
             </ul>
@@ -62,7 +66,7 @@ export function PublicFooter() {
         {/* Copyright */}
         <div className="pt-8 border-t border-white/10 text-center">
           <p className="text-white/40 text-sm">
-            © {new Date().getFullYear()} EduGlass by{" "}
+            © {new Date().getFullYear()} Aegix SLE by{" "}
             <a 
               href="https://profile-portfolio-aga.vercel.app/" 
               target="_blank" 

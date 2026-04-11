@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils"
 import { CheckCircle, XCircle, AlertCircle, Info, X } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 interface GlassToastProps {
   isOpen: boolean
@@ -14,23 +14,60 @@ interface GlassToastProps {
 
 export const GlassToast = ({ isOpen, onClose, message, type = "success", duration = 3000 }: GlassToastProps) => {
   const [isClosing, setIsClosing] = useState(false)
+  const autoCloseTimerRef = useRef<number | null>(null)
+  const closeAnimationTimerRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (autoCloseTimerRef.current !== null) {
+        window.clearTimeout(autoCloseTimerRef.current)
+      }
+      if (closeAnimationTimerRef.current !== null) {
+        window.clearTimeout(closeAnimationTimerRef.current)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (isOpen) {
       setIsClosing(false)
-      const timer = setTimeout(() => {
+      if (autoCloseTimerRef.current !== null) {
+        window.clearTimeout(autoCloseTimerRef.current)
+      }
+      if (closeAnimationTimerRef.current !== null) {
+        window.clearTimeout(closeAnimationTimerRef.current)
+      }
+      autoCloseTimerRef.current = window.setTimeout(() => {
         setIsClosing(true)
-        setTimeout(onClose, 300) // Wait for animation
+        closeAnimationTimerRef.current = window.setTimeout(() => {
+          onClose()
+          closeAnimationTimerRef.current = null
+        }, 300) // Wait for animation
       }, duration)
-      return () => clearTimeout(timer)
+      return () => {
+        if (autoCloseTimerRef.current !== null) {
+          window.clearTimeout(autoCloseTimerRef.current)
+          autoCloseTimerRef.current = null
+        }
+      }
     }
   }, [isOpen, duration, onClose])
 
   if (!isOpen && !isClosing) return null
 
   const handleClose = () => {
+    if (autoCloseTimerRef.current !== null) {
+      window.clearTimeout(autoCloseTimerRef.current)
+      autoCloseTimerRef.current = null
+    }
+    if (closeAnimationTimerRef.current !== null) {
+      window.clearTimeout(closeAnimationTimerRef.current)
+    }
     setIsClosing(true)
-    setTimeout(onClose, 300)
+    closeAnimationTimerRef.current = window.setTimeout(() => {
+      onClose()
+      closeAnimationTimerRef.current = null
+    }, 300)
   }
 
   const variants = {

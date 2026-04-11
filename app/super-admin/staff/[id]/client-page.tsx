@@ -1,5 +1,6 @@
 "use client"
 
+import { useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
 import { GlassCard } from "@/components/molecules/glass-card"
@@ -31,9 +32,7 @@ interface ClientPageProps {
 
 export default function StaffDetailClient({ id }: ClientPageProps) {
   const router = useRouter()
-  const staffId = id
-
-  const staff = mockEmployees.find(e => e.id === staffId)
+  const staff = useMemo(() => mockEmployees.find((employee) => employee.id === id), [id])
 
   if (!staff) {
     return (
@@ -56,26 +55,35 @@ export default function StaffDetailClient({ id }: ClientPageProps) {
   }
 
   // Calculate performance metrics
-  const staffSchedules = mockSchedule.filter(s => s.teacherId === staff.id)
-  const staffTasks = mockTasks.filter(t => t.teacherId === staff.id)
-  const staffTaskSubmissions = mockTaskSubmissions.filter(ts => 
-    staffTasks.some(t => t.id === ts.taskId)
+  const staffSchedules = useMemo(() => mockSchedule.filter((schedule) => schedule.teacherId === staff.id), [staff.id])
+  const staffTasks = useMemo(() => mockTasks.filter((task) => task.teacherId === staff.id), [staff.id])
+  const staffTaskSubmissions = useMemo(() => {
+    const taskIds = new Set(staffTasks.map((task) => task.id))
+    return mockTaskSubmissions.filter((submission) => taskIds.has(submission.taskId))
+  }, [staffTasks])
+  const gradedSubmissions = useMemo(
+    () => staffTaskSubmissions.filter((submission) => submission.status === "GRADED"),
+    [staffTaskSubmissions],
   )
-  const gradedSubmissions = staffTaskSubmissions.filter(s => s.status === "GRADED")
-  const homeroomClass = staff.homeroomClassId 
-    ? mockClasses.find(c => c.id === staff.homeroomClassId) 
-    : null
+  const homeroomClass = useMemo(
+    () => (staff.homeroomClassId ? mockClasses.find((item) => item.id === staff.homeroomClassId) : null),
+    [staff.homeroomClassId],
+  )
 
   // Mock performance data
-  const performanceData = {
-    teachingScore: 85,
-    attendanceRate: 95,
-    taskCompletion: staffTaskSubmissions.length > 0 
-      ? Math.round((gradedSubmissions.length / staffTaskSubmissions.length) * 100) 
-      : 92,
-    studentSatisfaction: 88,
-    overallScore: 90,
-  }
+  const performanceData = useMemo(
+    () => ({
+      teachingScore: 85,
+      attendanceRate: 95,
+      taskCompletion:
+        staffTaskSubmissions.length > 0
+          ? Math.round((gradedSubmissions.length / staffTaskSubmissions.length) * 100)
+          : 92,
+      studentSatisfaction: 88,
+      overallScore: 90,
+    }),
+    [staffTaskSubmissions.length, gradedSubmissions.length],
+  )
 
   const performanceHistory = [
     { month: "Jan", score: 85 },

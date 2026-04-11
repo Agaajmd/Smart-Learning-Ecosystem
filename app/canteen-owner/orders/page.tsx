@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
 import { GlassCard } from "@/components/molecules/glass-card"
+import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { 
   mockCanteenOwners,
   getOrdersByCanteen,
@@ -28,13 +29,16 @@ export default function CanteenOwnerOrdersPage() {
   const [orders, setOrders] = useState<Order[]>(getOrdersByCanteen(owner.canteenId))
   const [filterStatus, setFilterStatus] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 250)
 
-  const filteredOrders = orders.filter(o => {
-    const matchesSearch = o.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          o.id.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = filterStatus === "all" || o.status === filterStatus
-    return matchesSearch && matchesStatus
-  })
+  const filteredOrders = useMemo(() => {
+    const query = debouncedSearchQuery.toLowerCase()
+    return orders.filter((order) => {
+      const matchesSearch = !query || order.customerName.toLowerCase().includes(query) || order.id.toLowerCase().includes(query)
+      const matchesStatus = filterStatus === "all" || order.status === filterStatus
+      return matchesSearch && matchesStatus
+    })
+  }, [orders, filterStatus, debouncedSearchQuery])
 
   const handleUpdateOrderStatus = (orderId: string, newStatus: OrderStatus) => {
     setOrders(orders.map(o => o.id === orderId ? { 
@@ -78,14 +82,33 @@ export default function CanteenOwnerOrdersPage() {
     }
   }
 
-  const statusFilters = [
-    { value: "all", label: "Semua", count: orders.length },
-    { value: "PENDING", label: "Menunggu", count: orders.filter(o => o.status === "PENDING").length },
-    { value: "PREPARING", label: "Diproses", count: orders.filter(o => o.status === "PREPARING").length },
-    { value: "READY", label: "Siap", count: orders.filter(o => o.status === "READY").length },
-    { value: "COMPLETED", label: "Selesai", count: orders.filter(o => o.status === "COMPLETED").length },
-    { value: "CANCELLED", label: "Batal", count: orders.filter(o => o.status === "CANCELLED").length },
-  ]
+  const statusCounts = useMemo(() => {
+    return orders.reduce(
+      (acc, order) => {
+        acc[order.status] += 1
+        return acc
+      },
+      {
+        PENDING: 0,
+        PREPARING: 0,
+        READY: 0,
+        COMPLETED: 0,
+        CANCELLED: 0,
+      },
+    )
+  }, [orders])
+
+  const statusFilters = useMemo(
+    () => [
+      { value: "all", label: "Semua", count: orders.length },
+      { value: "PENDING", label: "Menunggu", count: statusCounts.PENDING },
+      { value: "PREPARING", label: "Diproses", count: statusCounts.PREPARING },
+      { value: "READY", label: "Siap", count: statusCounts.READY },
+      { value: "COMPLETED", label: "Selesai", count: statusCounts.COMPLETED },
+      { value: "CANCELLED", label: "Batal", count: statusCounts.CANCELLED },
+    ],
+    [orders.length, statusCounts],
+  )
 
   return (
     <DashboardLayout role="CANTEEN_OWNER" userName={owner.name} userAvatar={owner.avatar}>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { 
@@ -15,7 +15,6 @@ import {
   FileText, 
   AlertTriangle, 
   ChevronRight, 
-  Settings, 
   Wallet, 
   Award, 
   Package, 
@@ -45,6 +44,7 @@ export const BottomNavigation = ({ role, userName, userAvatar }: BottomNavigatio
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const { logout } = useAuth()
+  const logoutTimerRef = useRef<number | null>(null)
 
   // Main bottom nav items (limited to 4)
   const getNavItems = () => {
@@ -121,10 +121,9 @@ export const BottomNavigation = ({ role, userName, userAvatar }: BottomNavigatio
         return [
           { href: "/admin", icon: Home, label: "Dashboard" },
           { href: "/admin/class", icon: LayoutGrid, label: "Manajemen Kelas" },
-          { href: "/admin/scan", icon: QrCode, label: "Scan Aset" },
+          { href: "/admin/scan", icon: QrCode, label: "Scan & Laporan" },
           { href: "/admin/users", icon: Users, label: "Data Pengguna" },
           { href: "/admin/canteen", icon: Store, label: "Kelola Kantin" },
-          { href: "/admin/reports", icon: FileText, label: "Laporan" },
           { href: "/admin/schedule", icon: Calendar, label: "Jadwal" },
           { href: "/canteen", icon: Utensils, label: "Kantin" },
         ]
@@ -133,7 +132,6 @@ export const BottomNavigation = ({ role, userName, userAvatar }: BottomNavigatio
           { href: "/super-admin", icon: Home, label: "Dashboard" },
           { href: "/super-admin/finance", icon: BarChart3, label: "Keuangan" },
           { href: "/super-admin/staff", icon: Users, label: "Manajemen Staff" },
-          { href: "/super-admin/users", icon: Settings, label: "Pengaturan" },
           { href: "/canteen", icon: Utensils, label: "Kantin" },
         ]
       case "PARENT":
@@ -158,23 +156,35 @@ export const BottomNavigation = ({ role, userName, userAvatar }: BottomNavigatio
     }
   }
 
-  const navItems = getNavItems()
-  const allMenuItems = getAllMenuItems()
+  const navItems = useMemo(() => getNavItems(), [role])
+  const allMenuItems = useMemo(() => getAllMenuItems(), [role])
 
-  const handleLogout = () => {
+  useEffect(() => {
+    return () => {
+      if (logoutTimerRef.current !== null) {
+        window.clearTimeout(logoutTimerRef.current)
+      }
+    }
+  }, [])
+
+  const handleLogout = useCallback(() => {
     setIsOpen(false)
-    setTimeout(() => {
+    if (logoutTimerRef.current !== null) {
+      window.clearTimeout(logoutTimerRef.current)
+    }
+    logoutTimerRef.current = window.setTimeout(() => {
       logout()
       toast.success("Logout berhasil!", {
         description: "Sampai jumpa lagi 👋",
       })
+      logoutTimerRef.current = null
     }, 300)
-  }
+  }, [logout])
 
-  const handleProfileClick = () => {
+  const handleProfileClick = useCallback(() => {
     router.push(`/${role.toLowerCase().replace('_', '-')}/profile`)
     setIsOpen(false)
-  }
+  }, [role, router])
 
   const roleLabels: Record<UserRole, string> = {
     STUDENT: "Siswa",

@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
-import { GlassCard } from "@/components/molecules/glass-card"
 import { FinancialChart } from "@/components/organisms/financial-chart"
 import { EmployeeLeaderboard } from "@/components/organisms/employee-leaderboard"
 import { mockSuperAdmins, mockFinancialData, mockEmployees, mockStudents, mockClasses } from "@/lib/mock-data"
@@ -19,8 +18,6 @@ import {
   BarChart3,
   PieChart,
   Calendar,
-  FileText,
-  Settings,
   Bell,
   ChevronRight,
   Star,
@@ -76,8 +73,7 @@ export default function SuperAdminDashboard() {
 
   const menuItems = [
     { href: "/super-admin/finance", icon: BarChart3, label: "Keuangan", description: "Kelola keuangan sekolah", color: "bg-emerald-500" },
-    { href: "/super-admin/staff", icon: Users, label: "Manajemen Staff", description: "Evaluasi dan kelola guru/staff", color: "bg-blue-500" },
-    { href: "/super-admin/users", icon: Settings, label: "Pengaturan Sistem", description: "Konfigurasi sistem sekolah", color: "bg-purple-500" },
+    { href: "/super-admin/staff", icon: Users, label: "Manajemen Staff", description: "Kelola staff, admin, dan pengaturan akses", color: "bg-blue-500" },
   ]
 
   return (
@@ -211,7 +207,7 @@ export default function SuperAdminDashboard() {
         {/* Quick Access Menu */}
         <div>
           <h2 className="font-semibold text-slate-800 mb-4">Menu Utama</h2>
-          <div className="grid sm:grid-cols-3 gap-4">
+          <div className="grid sm:grid-cols-2 gap-4">
             {menuItems.map((item) => {
               const Icon = item.icon
               return (

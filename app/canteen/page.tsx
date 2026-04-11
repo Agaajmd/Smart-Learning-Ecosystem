@@ -1,11 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useMemo, useState } from "react"
+import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { 
   mockCanteens,
   mockProducts,
-  mockStudents,
-  getProductsByCanteen,
   type Product,
   type Canteen,
   type OrderItem,
@@ -18,10 +17,6 @@ import {
   Plus,
   Minus,
   X,
-  MapPin,
-  Clock,
-  ChevronRight,
-  Filter,
   Utensils,
   Coffee,
   Cookie,
@@ -42,20 +37,28 @@ export default function CanteenPage() {
   const [cart, setCart] = useState<CartItem[]>([])
   const [showCart, setShowCart] = useState(false)
   const [selectedCanteen, setSelectedCanteen] = useState<Canteen | null>(null)
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 250)
 
-  const activeCanteens = mockCanteens.filter(c => c.isOpen)
+  const activeCanteens = useMemo(() => mockCanteens.filter((canteen) => canteen.isOpen), [])
   
-  const allProducts = mockProducts.filter(p => {
-    const canteen = mockCanteens.find(c => c.id === p.canteenId)
-    return canteen?.isOpen && p.isAvailable
-  })
+  const allProducts = useMemo(
+    () =>
+      mockProducts.filter((product) => {
+        const canteen = mockCanteens.find((item) => item.id === product.canteenId)
+        return canteen?.isOpen && product.isAvailable
+      }),
+    [],
+  )
 
-  const filteredProducts = allProducts.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesCategory = selectedCategory === "all" || p.category === selectedCategory
-    const matchesCanteen = !selectedCanteen || p.canteenId === selectedCanteen.id
-    return matchesSearch && matchesCategory && matchesCanteen
-  })
+  const filteredProducts = useMemo(() => {
+    const query = debouncedSearchQuery.toLowerCase()
+    return allProducts.filter((product) => {
+      const matchesSearch = !query || product.name.toLowerCase().includes(query)
+      const matchesCategory = selectedCategory === "all" || product.category === selectedCategory
+      const matchesCanteen = !selectedCanteen || product.canteenId === selectedCanteen.id
+      return matchesSearch && matchesCategory && matchesCanteen
+    })
+  }, [allProducts, selectedCategory, selectedCanteen, debouncedSearchQuery])
 
   const categories = [
     { value: "all", label: "Semua", icon: Store },
@@ -64,10 +67,10 @@ export default function CanteenPage() {
     { value: "SNACK", label: "Snack", icon: Cookie },
   ]
 
-  const cartTotal = cart.reduce((acc, item) => acc + item.price, 0)
-  const cartItemCount = cart.reduce((acc, item) => acc + item.quantity, 0)
+  const cartTotal = useMemo(() => cart.reduce((acc, item) => acc + item.price, 0), [cart])
+  const cartItemCount = useMemo(() => cart.reduce((acc, item) => acc + item.quantity, 0), [cart])
 
-  const addToCart = (product: Product) => {
+  const addToCart = useCallback((product: Product) => {
     const canteen = mockCanteens.find(c => c.id === product.canteenId)
     if (!canteen) return
 
@@ -79,59 +82,73 @@ export default function CanteenPage() {
       return
     }
 
-    const existingItem = cart.find(item => item.productId === product.id)
+    const existingItem = cart.find((item) => item.productId === product.id)
     if (existingItem) {
-      setCart(cart.map(item => 
-        item.productId === product.id 
-          ? { ...item, quantity: item.quantity + 1, price: item.price + product.price }
-          : item
-      ))
+      setCart((prev) =>
+        prev.map((item) =>
+          item.productId === product.id
+            ? { ...item, quantity: item.quantity + 1, price: item.price + product.price }
+            : item,
+        ),
+      )
     } else {
-      setCart([...cart, {
-        productId: product.id,
-        productName: product.name,
-        quantity: 1,
-        price: product.price,
-        canteenId: product.canteenId,
-        canteenName: canteen.name,
-      }])
+      setCart((prev) => [
+        ...prev,
+        {
+          productId: product.id,
+          productName: product.name,
+          quantity: 1,
+          price: product.price,
+          canteenId: product.canteenId,
+          canteenName: canteen.name,
+        },
+      ])
     }
     toast.success(`${product.name} ditambahkan ke keranjang`)
-  }
+  }, [cart])
 
-  const removeFromCart = (productId: string) => {
+  const removeFromCart = useCallback((productId: string) => {
     const existingItem = cart.find(item => item.productId === productId)
     if (existingItem && existingItem.quantity > 1) {
       const product = mockProducts.find(p => p.id === productId)
       if (product) {
-        setCart(cart.map(item => 
-          item.productId === productId 
-            ? { ...item, quantity: item.quantity - 1, price: item.price - product.price }
-            : item
-        ))
+        setCart((prev) =>
+          prev.map((item) =>
+            item.productId === productId
+              ? { ...item, quantity: item.quantity - 1, price: item.price - product.price }
+              : item,
+          ),
+        )
       }
     } else {
-      setCart(cart.filter(item => item.productId !== productId))
+      setCart((prev) => prev.filter((item) => item.productId !== productId))
     }
-  }
+  }, [cart])
 
-  const clearCart = () => {
+  const clearCart = useCallback(() => {
     setCart([])
     setShowCart(false)
-  }
+  }, [])
 
-  const handleCheckout = () => {
+  const handleCheckout = useCallback(() => {
     if (cart.length === 0) return
     toast.success("Pesanan berhasil dibuat!", {
       description: "Pesanan Anda sedang diproses oleh kantin",
     })
     clearCart()
-  }
+  }, [cart.length, clearCart])
 
-  const getItemQuantity = (productId: string) => {
-    const item = cart.find(i => i.productId === productId)
-    return item?.quantity || 0
-  }
+  const quantityByProduct = useMemo(() => {
+    return cart.reduce<Record<string, number>>((acc, item) => {
+      acc[item.productId] = item.quantity
+      return acc
+    }, {})
+  }, [cart])
+
+  const getItemQuantity = useCallback(
+    (productId: string) => quantityByProduct[productId] ?? 0,
+    [quantityByProduct],
+  )
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50/30">

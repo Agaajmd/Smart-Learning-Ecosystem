@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
@@ -8,6 +8,8 @@ import { GlassCard } from "@/components/molecules/glass-card"
 import { GlassInput } from "@/components/atoms/glass-input"
 import { GlassButton } from "@/components/atoms/glass-button"
 import { GlassModal } from "@/components/molecules/glass-modal"
+import { useDebouncedValue } from "@/hooks/use-debounced-value"
+import { getAllAuthUsers, removeAuthUserCredential, upsertAuthUserCredential } from "@/lib/auth-user-storage"
 import { mockSuperAdmins, mockEmployees, mockAdmins, mockSchedule, Employee, User } from "@/lib/mock-data"
 import {
   Search,
@@ -27,18 +29,23 @@ import {
   Save,
   X,
   AlertTriangle,
+  Filter,
 } from "lucide-react"
+
+type StaffFilterType = "all" | "teacher" | "admin"
 
 export default function SuperAdminStaff() {
   const superAdmin = mockSuperAdmins[0]
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
+  const [selectedFilter, setSelectedFilter] = useState<StaffFilterType>("all")
   const [selectedEmployee, setSelectedEmployee] = useState<(typeof mockEmployees)[0] | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [staffToDelete, setStaffToDelete] = useState<(typeof mockEmployees)[0] | (typeof mockAdmins)[0] | null>(null)
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 250)
   
   // Staff list state (for CRUD operations)
   const [teachers, setTeachers] = useState([...mockEmployees])
@@ -49,6 +56,7 @@ export default function SuperAdminStaff() {
     type: "teacher" as "teacher" | "admin",
     name: "",
     email: "",
+    password: "",
     subject: "",
   })
   
@@ -58,42 +66,74 @@ export default function SuperAdminStaff() {
     type: "teacher" as "teacher" | "admin",
     name: "",
     email: "",
+    password: "",
     subject: "",
   })
 
-  const allStaff = [...teachers, ...admins]
+  const allStaff = useMemo(() => [...teachers, ...admins], [teachers, admins])
 
-  const filteredStaff = searchQuery
-    ? allStaff.filter(
-        (s) =>
-          s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          s.email.toLowerCase().includes(searchQuery.toLowerCase()),
-      )
-    : allStaff
+  const filteredByTypeStaff = useMemo(() => {
+    if (selectedFilter === "all") return allStaff
+    if (selectedFilter === "teacher") return teachers
+    return admins
+  }, [selectedFilter, allStaff, teachers, admins])
 
-  const getEmployeeStats = (employeeId: string) => {
-    const schedule = mockSchedule.filter((s) => s.teacherId === employeeId)
-    return {
-      totalClasses: schedule.length,
-      uniqueClasses: [...new Set(schedule.map((s) => s.classId))].length,
+  const filteredStaff = useMemo(() => {
+    if (!debouncedSearchQuery) return filteredByTypeStaff
+
+    const query = debouncedSearchQuery.toLowerCase()
+    return filteredByTypeStaff.filter((staff) =>
+      staff.name.toLowerCase().includes(query) || staff.email.toLowerCase().includes(query),
+    )
+  }, [filteredByTypeStaff, debouncedSearchQuery])
+
+  const teacherScheduleStats = useMemo(() => {
+    const classIdsByTeacher = new Map<string, Set<string>>()
+    const totalByTeacher = new Map<string, number>()
+
+    for (const schedule of mockSchedule) {
+      totalByTeacher.set(schedule.teacherId, (totalByTeacher.get(schedule.teacherId) ?? 0) + 1)
+
+      const classIds = classIdsByTeacher.get(schedule.teacherId)
+      if (classIds) {
+        classIds.add(schedule.classId)
+      } else {
+        classIdsByTeacher.set(schedule.teacherId, new Set([schedule.classId]))
+      }
     }
-  }
 
-  const avgRating = teachers.length > 0 
-    ? (teachers.reduce((acc, e) => acc + e.rating, 0) / teachers.length).toFixed(1)
-    : "0"
-  const totalClasses = teachers.reduce((acc, e) => acc + e.classesCount, 0)
+    const statsMap = new Map<string, { totalClasses: number; uniqueClasses: number }>()
+    for (const [teacherId, totalClasses] of totalByTeacher.entries()) {
+      statsMap.set(teacherId, {
+        totalClasses,
+        uniqueClasses: classIdsByTeacher.get(teacherId)?.size ?? 0,
+      })
+    }
+
+    return statsMap
+  }, [])
+
+  const avgRating = useMemo(
+    () => (teachers.length > 0 ? (teachers.reduce((acc, employee) => acc + employee.rating, 0) / teachers.length).toFixed(1) : "0"),
+    [teachers],
+  )
+  const totalClasses = useMemo(() => teachers.reduce((acc, employee) => acc + employee.classesCount, 0), [teachers])
 
   // CRUD Handlers
-  const handleAddStaff = () => {
-    if (!newStaff.name || !newStaff.email) {
-      toast.error("Nama dan email wajib diisi")
+  const handleAddStaff = useCallback(() => {
+    if (!newStaff.name || !newStaff.email || !newStaff.password) {
+      toast.error("Nama, email, dan password wajib diisi")
+      return
+    }
+
+    if (newStaff.password.length < 6) {
+      toast.error("Password minimal 6 karakter")
       return
     }
 
     if (newStaff.type === "teacher") {
       const newTeacher: Employee = {
-        id: `e${teachers.length + 1}`,
+        id: `e${Date.now()}`,
         name: newStaff.name,
         email: newStaff.email,
         avatar: "/placeholder.svg?height=100&width=100",
@@ -102,82 +142,126 @@ export default function SuperAdminStaff() {
         rating: 4.5,
         classesCount: 0,
       }
-      setTeachers([...teachers, newTeacher])
+      setTeachers((prev) => [...prev, newTeacher])
+      upsertAuthUserCredential({
+        id: newTeacher.id,
+        name: newTeacher.name,
+        email: newTeacher.email,
+        avatar: newTeacher.avatar,
+        role: "EMPLOYEE",
+        password: newStaff.password,
+      })
     } else {
       const newAdmin: User = {
-        id: `a${admins.length + 1}`,
+        id: `a${Date.now()}`,
         name: newStaff.name,
         email: newStaff.email,
         avatar: "/placeholder.svg?height=100&width=100",
         role: "ADMIN",
       }
-      setAdmins([...admins, newAdmin])
+      setAdmins((prev) => [...prev, newAdmin])
+      upsertAuthUserCredential({
+        id: newAdmin.id,
+        name: newAdmin.name,
+        email: newAdmin.email,
+        avatar: newAdmin.avatar,
+        role: "ADMIN",
+        password: newStaff.password,
+      })
     }
 
     setShowAddModal(false)
-    setNewStaff({ type: "teacher", name: "", email: "", subject: "" })
+    setNewStaff({ type: "teacher", name: "", email: "", password: "", subject: "" })
     toast.success("Staff berhasil ditambahkan", {
       description: `${newStaff.name} telah ditambahkan sebagai ${newStaff.type === "teacher" ? "Guru" : "Admin"}`,
     })
-  }
+  }, [newStaff, teachers.length, admins.length])
 
-  const handleEditStaff = () => {
+  const handleEditStaff = useCallback(() => {
     if (!editStaff.name || !editStaff.email) {
       toast.error("Nama dan email wajib diisi")
       return
     }
 
+    if (editStaff.password && editStaff.password.length < 6) {
+      toast.error("Password minimal 6 karakter")
+      return
+    }
+
+    const existingCredential = getAllAuthUsers().find((user) => user.id === editStaff.id)
+    const password = editStaff.password || existingCredential?.password || (editStaff.type === "teacher" ? "guru123" : "admin123")
+
     if (editStaff.type === "teacher") {
-      setTeachers(teachers.map(t => 
+      setTeachers((prev) => prev.map(t => 
         t.id === editStaff.id 
           ? { ...t, name: editStaff.name, email: editStaff.email, subject: editStaff.subject }
           : t
       ))
+      upsertAuthUserCredential({
+        id: editStaff.id,
+        name: editStaff.name,
+        email: editStaff.email,
+        avatar: teachers.find((teacher) => teacher.id === editStaff.id)?.avatar || "/placeholder.svg?height=100&width=100",
+        role: "EMPLOYEE",
+        password,
+      })
     } else {
-      setAdmins(admins.map(a => 
+      setAdmins((prev) => prev.map(a => 
         a.id === editStaff.id 
           ? { ...a, name: editStaff.name, email: editStaff.email }
           : a
       ))
+      upsertAuthUserCredential({
+        id: editStaff.id,
+        name: editStaff.name,
+        email: editStaff.email,
+        avatar: admins.find((admin) => admin.id === editStaff.id)?.avatar || "/placeholder.svg?height=100&width=100",
+        role: "ADMIN",
+        password,
+      })
     }
 
     setShowEditModal(false)
+    setEditStaff((prev) => ({ ...prev, password: "" }))
     toast.success("Data staff berhasil diperbarui")
-  }
+  }, [editStaff, teachers, admins])
 
-  const handleDeleteStaff = () => {
+  const handleDeleteStaff = useCallback(() => {
     if (!staffToDelete) return
 
     const isTeacher = "subject" in staffToDelete
     if (isTeacher) {
-      setTeachers(teachers.filter(t => t.id !== staffToDelete.id))
+      setTeachers((prev) => prev.filter(t => t.id !== staffToDelete.id))
     } else {
-      setAdmins(admins.filter(a => a.id !== staffToDelete.id))
+      setAdmins((prev) => prev.filter(a => a.id !== staffToDelete.id))
     }
+
+    removeAuthUserCredential(staffToDelete.id)
 
     setShowDeleteModal(false)
     setStaffToDelete(null)
     toast.success("Staff berhasil dihapus", {
       description: `${staffToDelete.name} telah dihapus dari sistem`,
     })
-  }
+  }, [staffToDelete])
 
-  const openEditModal = (staff: typeof mockEmployees[0] | typeof mockAdmins[0]) => {
+  const openEditModal = useCallback((staff: typeof mockEmployees[0] | typeof mockAdmins[0]) => {
     const isTeacher = "subject" in staff
     setEditStaff({
       id: staff.id,
       type: isTeacher ? "teacher" : "admin",
       name: staff.name,
       email: staff.email,
+      password: "",
       subject: isTeacher ? (staff as typeof mockEmployees[0]).subject : "",
     })
     setShowEditModal(true)
-  }
+  }, [])
 
-  const openDeleteModal = (staff: typeof mockEmployees[0] | typeof mockAdmins[0]) => {
+  const openDeleteModal = useCallback((staff: typeof mockEmployees[0] | typeof mockAdmins[0]) => {
     setStaffToDelete(staff)
     setShowDeleteModal(true)
-  }
+  }, [])
 
   return (
     <DashboardLayout role="SUPER_ADMIN" userName={superAdmin.name} userAvatar={superAdmin.avatar}>
@@ -229,6 +313,31 @@ export default function SuperAdminStaff() {
           </div>
         </GlassCard>
 
+        {/* Filter */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          <div className="flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs sm:text-sm whitespace-nowrap">
+            <Filter className="w-4 h-4" />
+            Filter Staff
+          </div>
+          {[
+            { key: "all" as const, label: "Semua" },
+            { key: "teacher" as const, label: "Guru" },
+            { key: "admin" as const, label: "Admin" },
+          ].map((filterItem) => (
+            <button
+              key={filterItem.key}
+              onClick={() => setSelectedFilter(filterItem.key)}
+              className={`px-3 py-2 rounded-xl text-xs sm:text-sm whitespace-nowrap transition-colors ${
+                selectedFilter === filterItem.key
+                  ? "bg-slate-800 text-white"
+                  : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              {filterItem.label}
+            </button>
+          ))}
+        </div>
+
         {/* Staff List */}
         <GlassCard>
           <h2 className="text-base sm:text-lg font-semibold text-slate-800 mb-3 sm:mb-4">
@@ -238,7 +347,7 @@ export default function SuperAdminStaff() {
           <div className="space-y-2 sm:space-y-3">
             {filteredStaff.map((staff) => {
               const isTeacher = "subject" in staff
-              const stats = isTeacher ? getEmployeeStats(staff.id) : null
+              const stats = isTeacher ? teacherScheduleStats.get(staff.id) : null
 
               return (
                 <div
@@ -427,14 +536,14 @@ export default function SuperAdminStaff() {
         <GlassModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} title="Tambah Staff Baru">
           <div className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">Tipe Staff</label>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Tipe Staff</label>
               <div className="flex gap-3">
                 <button
                   onClick={() => setNewStaff({ ...newStaff, type: "teacher" })}
                   className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all ${
                     newStaff.type === "teacher"
-                      ? "bg-emerald-500/20 border-emerald-500 text-emerald-300"
-                      : "bg-white/5 border-white/20 text-white/60 hover:border-white/40"
+                      ? "bg-emerald-100 border-emerald-500 text-emerald-700"
+                      : "bg-slate-100 border-slate-200 text-slate-600 hover:border-slate-300"
                   }`}
                 >
                   <Users className="w-5 h-5 mx-auto mb-1" />
@@ -444,8 +553,8 @@ export default function SuperAdminStaff() {
                   onClick={() => setNewStaff({ ...newStaff, type: "admin" })}
                   className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all ${
                     newStaff.type === "admin"
-                      ? "bg-orange-500/20 border-orange-500 text-orange-300"
-                      : "bg-white/5 border-white/20 text-white/60 hover:border-white/40"
+                      ? "bg-orange-100 border-orange-500 text-orange-700"
+                      : "bg-slate-100 border-slate-200 text-slate-600 hover:border-slate-300"
                   }`}
                 >
                   <Shield className="w-5 h-5 mx-auto mb-1" />
@@ -455,7 +564,7 @@ export default function SuperAdminStaff() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-1.5">Nama Lengkap</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Nama Lengkap</label>
               <GlassInput
                 placeholder="Masukkan nama lengkap"
                 value={newStaff.name}
@@ -464,7 +573,7 @@ export default function SuperAdminStaff() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-1.5">Email</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
               <GlassInput
                 type="email"
                 placeholder="Masukkan email"
@@ -473,9 +582,19 @@ export default function SuperAdminStaff() {
               />
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
+              <GlassInput
+                type="password"
+                placeholder="Minimal 6 karakter"
+                value={newStaff.password}
+                onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })}
+              />
+            </div>
+
             {newStaff.type === "teacher" && (
               <div>
-                <label className="block text-sm font-medium text-white/80 mb-1.5">Mata Pelajaran</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Mata Pelajaran</label>
                 <GlassInput
                   placeholder="Contoh: Matematika, Fisika, dll"
                   value={newStaff.subject}
@@ -484,7 +603,7 @@ export default function SuperAdminStaff() {
               </div>
             )}
 
-            <div className="flex gap-3 pt-3 border-t border-white/10">
+            <div className="flex gap-3 pt-3 border-t border-slate-100">
               <GlassButton
                 variant="secondary"
                 className="flex-1 justify-center"
@@ -505,7 +624,7 @@ export default function SuperAdminStaff() {
         <GlassModal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Edit Staff">
           <div className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-1.5">Nama Lengkap</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Nama Lengkap</label>
               <GlassInput
                 placeholder="Masukkan nama lengkap"
                 value={editStaff.name}
@@ -514,7 +633,7 @@ export default function SuperAdminStaff() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-1.5">Email</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
               <GlassInput
                 type="email"
                 placeholder="Masukkan email"
@@ -523,9 +642,19 @@ export default function SuperAdminStaff() {
               />
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Password Baru (opsional)</label>
+              <GlassInput
+                type="password"
+                placeholder="Kosongkan jika tidak diubah"
+                value={editStaff.password}
+                onChange={(e) => setEditStaff({ ...editStaff, password: e.target.value })}
+              />
+            </div>
+
             {editStaff.type === "teacher" && (
               <div>
-                <label className="block text-sm font-medium text-white/80 mb-1.5">Mata Pelajaran</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Mata Pelajaran</label>
                 <GlassInput
                   placeholder="Contoh: Matematika, Fisika, dll"
                   value={editStaff.subject}
@@ -534,7 +663,7 @@ export default function SuperAdminStaff() {
               </div>
             )}
 
-            <div className="flex gap-3 pt-3 border-t border-white/10">
+            <div className="flex gap-3 pt-3 border-t border-slate-100">
               <GlassButton
                 variant="secondary"
                 className="flex-1 justify-center"

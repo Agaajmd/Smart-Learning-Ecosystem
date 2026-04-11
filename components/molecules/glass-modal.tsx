@@ -27,6 +27,10 @@ export const GlassModal = ({
   const [isAnimating, setIsAnimating] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
   const modalRef = useRef<HTMLDivElement>(null)
+  const closeTimerRef = useRef<number | null>(null)
+  const hideTimerRef = useRef<number | null>(null)
+  const animationFrameOneRef = useRef<number | null>(null)
+  const animationFrameTwoRef = useRef<number | null>(null)
 
   // Handle mounting for portal
   useEffect(() => {
@@ -39,30 +43,69 @@ export const GlassModal = ({
       setIsVisible(true)
       document.body.style.overflow = 'hidden'
       // Trigger animation after mount with slight delay for smoothness
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
+      animationFrameOneRef.current = requestAnimationFrame(() => {
+        animationFrameTwoRef.current = requestAnimationFrame(() => {
           setIsAnimating(true)
         })
       })
     } else {
       setIsAnimating(false)
-      const timer = setTimeout(() => {
+      hideTimerRef.current = window.setTimeout(() => {
         setIsVisible(false)
         document.body.style.overflow = ''
       }, 250)
-      return () => clearTimeout(timer)
     }
     return () => {
+      if (hideTimerRef.current !== null) {
+        window.clearTimeout(hideTimerRef.current)
+        hideTimerRef.current = null
+      }
+      if (animationFrameOneRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameOneRef.current)
+        animationFrameOneRef.current = null
+      }
+      if (animationFrameTwoRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameTwoRef.current)
+        animationFrameTwoRef.current = null
+      }
       document.body.style.overflow = ''
     }
   }, [isOpen])
 
   const handleClose = useCallback(() => {
+    if (closeTimerRef.current !== null) {
+      return
+    }
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current)
+    }
     setIsAnimating(false)
-    setTimeout(() => {
+    closeTimerRef.current = window.setTimeout(() => {
       onClose()
+      closeTimerRef.current = null
     }, 250)
   }, [onClose])
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current !== null) {
+        window.clearTimeout(closeTimerRef.current)
+        closeTimerRef.current = null
+      }
+      if (hideTimerRef.current !== null) {
+        window.clearTimeout(hideTimerRef.current)
+        hideTimerRef.current = null
+      }
+      if (animationFrameOneRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameOneRef.current)
+        animationFrameOneRef.current = null
+      }
+      if (animationFrameTwoRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameTwoRef.current)
+        animationFrameTwoRef.current = null
+      }
+    }
+  }, [])
 
   // Handle ESC key
   useEffect(() => {

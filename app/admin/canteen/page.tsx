@@ -28,6 +28,7 @@ import {
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
+import { getAllAuthUsers, removeAuthUserCredential, upsertAuthUserCredential } from "@/lib/auth-user-storage"
 
 export default function AdminCanteenPage() {
   const admin = mockAdmins[0]
@@ -39,6 +40,7 @@ export default function AdminCanteenPage() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    password: "",
     phone: "",
     canteenName: "",
     canteenDescription: "",
@@ -57,6 +59,7 @@ export default function AdminCanteenPage() {
       setFormData({
         name: owner.name,
         email: owner.email,
+        password: "",
         phone: owner.phone,
         canteenName: owner.canteenName,
         canteenDescription: canteen?.description || "",
@@ -67,6 +70,7 @@ export default function AdminCanteenPage() {
       setFormData({
         name: "",
         email: "",
+        password: "",
         phone: "",
         canteenName: "",
         canteenDescription: "",
@@ -82,7 +86,20 @@ export default function AdminCanteenPage() {
       return
     }
 
+    if (!editingOwner && formData.password.length < 6) {
+      toast.error("Password pemilik kantin minimal 6 karakter")
+      return
+    }
+
+    if (editingOwner && formData.password && formData.password.length < 6) {
+      toast.error("Password pemilik kantin minimal 6 karakter")
+      return
+    }
+
     if (editingOwner) {
+      const existingCredential = getAllAuthUsers().find((user) => user.id === editingOwner.id)
+      const password = formData.password || existingCredential?.password || "canteen123"
+
       setCanteenOwners(canteenOwners.map(o => o.id === editingOwner.id ? {
         ...o,
         name: formData.name,
@@ -96,6 +113,14 @@ export default function AdminCanteenPage() {
         name: formData.canteenName,
         description: formData.canteenDescription,
       } : c))
+      upsertAuthUserCredential({
+        id: editingOwner.id,
+        name: formData.name,
+        email: formData.email,
+        avatar: editingOwner.avatar,
+        role: "CANTEEN_OWNER",
+        password,
+      })
       toast.success("Data pemilik kantin berhasil diperbarui")
     } else {
       const newOwnerId = `co${Date.now()}`
@@ -126,6 +151,14 @@ export default function AdminCanteenPage() {
 
       setCanteenOwners([...canteenOwners, newOwner])
       setCanteens([...canteens, newCanteen])
+      upsertAuthUserCredential({
+        id: newOwner.id,
+        name: newOwner.name,
+        email: newOwner.email,
+        avatar: newOwner.avatar,
+        role: "CANTEEN_OWNER",
+        password: formData.password,
+      })
       toast.success("Pemilik kantin baru berhasil ditambahkan")
     }
     setShowModal(false)
@@ -137,6 +170,7 @@ export default function AdminCanteenPage() {
       if (owner) {
         setCanteenOwners(canteenOwners.filter(o => o.id !== ownerId))
         setCanteens(canteens.filter(c => c.id !== owner.canteenId))
+        removeAuthUserCredential(owner.id)
         toast.success("Pemilik kantin berhasil dihapus")
       }
     }
@@ -331,18 +365,28 @@ export default function AdminCanteenPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Telepon</label>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Password {editingOwner ? "(opsional)" : "*"}</label>
                 <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="081234567890"
+                  placeholder={editingOwner ? "Kosongkan jika tidak diubah" : "Minimal 6 karakter"}
                 />
               </div>
             </div>
 
             <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Telepon</label>
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="081234567890"
+              />
+            </div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Nama Kantin *</label>
               <input
                 type="text"

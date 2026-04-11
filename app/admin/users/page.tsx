@@ -1,10 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
 import { GlassCard } from "@/components/molecules/glass-card"
 import { GlassInput } from "@/components/atoms/glass-input"
 import { GlassModal } from "@/components/molecules/glass-modal"
+import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import {
   mockAdmins,
   mockStudents,
@@ -33,20 +34,29 @@ export default function AdminUsersPage() {
   const [selectedFilter, setSelectedFilter] = useState<UserType>("all")
   const [selectedUser, setSelectedUser] = useState<User | Student | Employee | null>(null)
   const [showUserModal, setShowUserModal] = useState(false)
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 250)
 
-  const filters: { id: UserType; label: string; icon: typeof GraduationCap; count: number }[] = [
-    {
-      id: "all",
-      label: "All",
-      icon: Filter,
-      count: mockStudents.length + mockEmployees.length + mockAdmins.length + mockSuperAdmins.length,
-    },
-    { id: "students", label: "Students", icon: GraduationCap, count: mockStudents.length },
-    { id: "employees", label: "Teachers", icon: Briefcase, count: mockEmployees.length },
-    { id: "admins", label: "Staff", icon: Shield, count: mockAdmins.length + mockSuperAdmins.length },
-  ]
+  const totalUsersCount = useMemo(
+    () => mockStudents.length + mockEmployees.length + mockAdmins.length + mockSuperAdmins.length,
+    [],
+  )
 
-  const getFilteredUsers = () => {
+  const filters: { id: UserType; label: string; icon: typeof GraduationCap; count: number }[] = useMemo(
+    () => [
+      {
+        id: "all",
+        label: "All",
+        icon: Filter,
+        count: totalUsersCount,
+      },
+      { id: "students", label: "Students", icon: GraduationCap, count: mockStudents.length },
+      { id: "employees", label: "Teachers", icon: Briefcase, count: mockEmployees.length },
+      { id: "admins", label: "Staff", icon: Shield, count: mockAdmins.length + mockSuperAdmins.length },
+    ],
+    [totalUsersCount],
+  )
+
+  const users = useMemo(() => {
     let users: (User | Student | Employee)[] = []
 
     switch (selectedFilter) {
@@ -63,16 +73,15 @@ export default function AdminUsersPage() {
         users = [...mockStudents, ...mockEmployees, ...mockAdmins, ...mockSuperAdmins]
     }
 
-    if (searchQuery) {
+    if (debouncedSearchQuery) {
+      const query = debouncedSearchQuery.toLowerCase()
       users = users.filter(
-        (u) =>
-          u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          u.email.toLowerCase().includes(searchQuery.toLowerCase()),
+        (u) => u.name.toLowerCase().includes(query) || u.email.toLowerCase().includes(query),
       )
     }
 
     return users
-  }
+  }, [selectedFilter, debouncedSearchQuery])
 
   const getRoleIcon = (role: string) => {
     switch (role) {
@@ -104,8 +113,6 @@ export default function AdminUsersPage() {
     }
   }
 
-  const users = getFilteredUsers()
-
   return (
     <DashboardLayout role="ADMIN" userName={admin.name} userAvatar={admin.avatar}>
       <div className="w-full max-w-4xl mx-auto space-y-4 sm:space-y-6">
@@ -116,7 +123,7 @@ export default function AdminUsersPage() {
           </div>
           <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl">
             <Users className="w-4 h-4 text-blue-600" />
-            <span className="text-sm text-slate-700 font-medium">Total: {mockStudents.length + mockEmployees.length + mockAdmins.length + mockSuperAdmins.length}</span>
+            <span className="text-sm text-slate-700 font-medium">Total: {totalUsersCount}</span>
           </div>
         </div>
 

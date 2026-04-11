@@ -1,4 +1,4 @@
-# 🎓 EduGlass - School Management System
+# 🎓 Aegix SLE - Smart Learning Ecosystem
 
 <div align="center">
 
@@ -7,7 +7,7 @@
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.0-38B2AC?style=for-the-badge&logo=tailwind-css)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
-**Modern School Management System dengan desain Liquid Glass yang elegan dan responsif.**
+**Modern Smart Learning Ecosystem dengan desain Liquid Glass yang elegan dan responsif.**
 
 [Demo](#-demo-accounts) • [Fitur](#-fitur-utama) • [Instalasi](#-instalasi) • [Tech Stack](#%EF%B8%8F-tech-stack)
 
@@ -70,7 +70,7 @@
 
 ```bash
 # 1. Clone atau extract project
-cd school-management-system
+cd aegix-sle
 
 # 2. Install dependencies
 npm install
@@ -137,7 +137,7 @@ npm run build
 ## 📁 Struktur Project
 
 ```
-school-management-system/
+aegix-sle/
 ├── app/                        # Next.js App Router
 │   ├── (auth)/                 # Auth routes (login, register)
 │   ├── admin/                  # Admin dashboard
@@ -296,7 +296,7 @@ npm run type-check   # TypeScript check (jika ada)
 
 **Created with ❤️ by Aga**
 
-Project ini dibuat sebagai School Management System modern dengan fokus pada:
+Project ini dibuat sebagai Smart Learning Ecosystem modern dengan fokus pada:
 - 🏗️ Clean architecture (Atomic Design)
 - 🔒 Type safety (TypeScript)
 - ♻️ Component reusability

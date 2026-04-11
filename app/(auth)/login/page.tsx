@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useCallback, useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { toast } from "sonner"
 import { GlassCard } from "@/components/molecules/glass-card"
 import { GlassButton } from "@/components/atoms/glass-button"
@@ -10,13 +10,21 @@ import { GlassInput } from "@/components/atoms/glass-input"
 import { useAuth } from "@/lib/auth"
 import { Eye, EyeOff, LogIn, GraduationCap, Lock, Mail, User, Shield, Crown, ArrowLeft } from "lucide-react"
 
+const DEMO_ACCOUNTS = [
+  { role: "Siswa", email: "andi@school.id", password: "student123", icon: User, color: "text-blue-500" },
+  { role: "Guru", email: "ahmad@school.id", password: "guru123", icon: GraduationCap, color: "text-emerald-500" },
+  { role: "Admin", email: "admin@school.id", password: "admin123", icon: Shield, color: "text-amber-500" },
+  { role: "Kepala Sekolah", email: "kepsek@school.id", password: "kepsek123", icon: Crown, color: "text-purple-500" },
+  { role: "Orang Tua", email: "bapak.pratama@gmail.com", password: "parent123", icon: User, color: "text-pink-500" },
+  { role: "Pemilik Kantin", email: "wartini@canteen.id", password: "canteen123", icon: User, color: "text-orange-500" },
+] as const
+
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const { login, getRedirectPath } = useAuth()
-  const router = useRouter()
+  const { login } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -34,12 +42,6 @@ export default function LoginPage() {
       toast.success("Login berhasil!", {
         description: "Selamat datang kembali",
       })
-      // Get user from localStorage to determine redirect
-      const storedUser = localStorage.getItem("auth_user")
-      if (storedUser) {
-        const user = JSON.parse(storedUser)
-        router.push(getRedirectPath(user.role))
-      }
     } else {
       toast.error("Login gagal", {
         description: result.error,
@@ -47,20 +49,10 @@ export default function LoginPage() {
     }
   }
 
-  // Demo accounts for quick access
-  const demoAccounts = [
-    { role: "Siswa", email: "andi@school.id", password: "student123", icon: User, color: "text-blue-500" },
-    { role: "Guru", email: "ahmad@school.id", password: "guru123", icon: GraduationCap, color: "text-emerald-500" },
-    { role: "Admin", email: "admin@school.id", password: "admin123", icon: Shield, color: "text-amber-500" },
-    { role: "Kepala Sekolah", email: "kepsek@school.id", password: "kepsek123", icon: Crown, color: "text-purple-500" },
-    { role: "Orang Tua", email: "bapak.pratama@gmail.com", password: "parent123", icon: User, color: "text-pink-500" },
-    { role: "Pemilik Kantin", email: "wartini@canteen.id", password: "canteen123", icon: User, color: "text-orange-500" },
-  ]
-
-  const handleDemoLogin = (demoEmail: string, demoPassword: string) => {
+  const handleDemoLogin = useCallback((demoEmail: string, demoPassword: string) => {
     setEmail(demoEmail)
     setPassword(demoPassword)
-  }
+  }, [])
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
@@ -78,12 +70,17 @@ export default function LoginPage() {
 
           {/* Logo & Title - Mobile */}
           <div className="md:hidden text-center space-y-3">
-            <div className="w-16 h-16 mx-auto bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/25">
-              <GraduationCap className="w-8 h-8 text-white" />
-            </div>
+            <Image
+              src="/AegixLogo.png"
+              alt="Aegix SLE Logo"
+              width={64}
+              height={64}
+              priority
+              className="w-16 h-16 mx-auto rounded-2xl shadow-lg shadow-blue-500/25"
+            />
             <div>
               <h1 className="text-2xl font-bold text-slate-800">Masuk</h1>
-              <p className="text-slate-500 text-sm">EduManage School System</p>
+              <p className="text-slate-500 text-sm">Aegix SLE</p>
             </div>
           </div>
 
@@ -155,14 +152,8 @@ export default function LoginPage() {
               </GlassButton>
             </form>
 
-            {/* Register Link */}
             <div className="text-center mt-5 pt-5 border-t border-slate-100">
-              <p className="text-slate-500 text-sm">
-                Belum punya akun?{" "}
-                <Link href="/register" className="text-blue-600 hover:text-blue-700 font-medium">
-                  Daftar di sini
-                </Link>
-              </p>
+              <p className="text-slate-500 text-sm">Akun dibuat oleh admin atau super admin.</p>
             </div>
           </GlassCard>
 
@@ -170,7 +161,7 @@ export default function LoginPage() {
           <GlassCard className="p-4 border-slate-200">
             <p className="text-xs text-slate-500 text-center mb-3">Demo Akun (klik untuk isi otomatis)</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {demoAccounts.map((demo) => (
+              {DEMO_ACCOUNTS.map((demo) => (
                 <button
                   key={demo.role}
                   onClick={() => handleDemoLogin(demo.email, demo.password)}
@@ -188,7 +179,7 @@ export default function LoginPage() {
 
           {/* Footer */}
           <p className="text-center text-slate-400 text-xs">
-            © 2025 EduManage by{" "}
+            © 2025 Aegix SLE by{" "}
             <a 
               href="https://profile-portfolio-aga.vercel.app/" 
               target="_blank" 
@@ -204,12 +195,17 @@ export default function LoginPage() {
       {/* Right Section - Illustration (Desktop only) */}
       <div className="hidden lg:flex flex-1 bg-gradient-to-br from-blue-500 to-blue-600 items-center justify-center p-12">
         <div className="max-w-md text-center text-white">
-          <div className="w-24 h-24 mx-auto bg-white/20 backdrop-blur rounded-3xl flex items-center justify-center mb-8">
-            <GraduationCap className="w-12 h-12 text-white" />
-          </div>
-          <h2 className="text-3xl font-bold mb-4">EduManage</h2>
+          <Image
+            src="/AegixLogo.png"
+            alt="Aegix SLE Logo"
+            width={96}
+            height={96}
+            priority
+            className="w-24 h-24 mx-auto rounded-3xl shadow-2xl shadow-blue-900/20 mb-8"
+          />
+          <h2 className="text-3xl font-bold mb-4">Aegix SLE</h2>
           <p className="text-white/80 text-lg">
-            Sistem Manajemen Sekolah Modern untuk Siswa, Guru, dan Admin
+            Smart Learning Ecosystem untuk Siswa, Guru, Orang Tua, dan Admin
           </p>
           <div className="mt-8 grid grid-cols-3 gap-4">
             <div className="bg-white/10 backdrop-blur rounded-xl p-4">

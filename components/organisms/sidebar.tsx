@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { toast } from "sonner"
 import {
@@ -12,7 +13,6 @@ import {
   BarChart3,
   Users,
   BookOpen,
-  GraduationCap,
   LogOut,
   FileText,
   AlertTriangle,
@@ -41,6 +41,7 @@ export const Sidebar = ({ role, userName, userAvatar }: SidebarProps) => {
   const pathname = usePathname()
   const { logout } = useAuth()
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const profilePath = `/${role.toLowerCase().replace("_", "-")}/profile`
 
   const getNavItems = () => {
     switch (role) {
@@ -66,10 +67,9 @@ export const Sidebar = ({ role, userName, userAvatar }: SidebarProps) => {
         return [
           { href: "/admin", icon: Home, label: "Dashboard" },
           { href: "/admin/class", icon: LayoutGrid, label: "Manajemen Kelas" },
-          { href: "/admin/scan", icon: QrCode, label: "Scan Aset" },
+          { href: "/admin/scan", icon: QrCode, label: "Scan & Laporan" },
           { href: "/admin/users", icon: Users, label: "Data Pengguna" },
           { href: "/admin/canteen", icon: Store, label: "Kelola Kantin" },
-          { href: "/admin/reports", icon: FileText, label: "Laporan" },
           { href: "/admin/schedule", icon: Calendar, label: "Jadwal" },
           { href: "/canteen", icon: Utensils, label: "Kantin" },
         ]
@@ -78,7 +78,6 @@ export const Sidebar = ({ role, userName, userAvatar }: SidebarProps) => {
           { href: "/super-admin", icon: Home, label: "Dashboard" },
           { href: "/super-admin/finance", icon: BarChart3, label: "Keuangan" },
           { href: "/super-admin/staff", icon: Users, label: "Manajemen Staff" },
-          { href: "/super-admin/users", icon: Settings, label: "Pengaturan" },
           { href: "/canteen", icon: Utensils, label: "Kantin" },
         ]
       case "PARENT":
@@ -119,12 +118,17 @@ export const Sidebar = ({ role, userName, userAvatar }: SidebarProps) => {
       <div className="w-full bg-white border border-slate-200 shadow-lg shadow-slate-200/50 rounded-2xl p-4 flex flex-col">
         {/* Logo */}
         <div className="flex items-center gap-3 px-3 py-4 mb-4">
-          <div className="p-2.5 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg shadow-blue-500/30 transition-transform duration-300 hover:scale-105">
-            <GraduationCap className="w-6 h-6 text-white" />
-          </div>
+          <Image
+            src="/AegixLogo.png"
+            alt="Aegix SLE Logo"
+            width={44}
+            height={44}
+            priority
+            className="rounded-xl shadow-lg shadow-blue-500/20 transition-transform duration-300 hover:scale-105"
+          />
           <div>
-            <h1 className="font-bold text-slate-800">EduManage</h1>
-            <p className="text-xs text-slate-500">School System</p>
+            <h1 className="font-bold text-slate-800">Aegix SLE</h1>
+            <p className="text-xs text-slate-500">Smart Learning Ecosystem</p>
           </div>
         </div>
 
@@ -175,12 +179,12 @@ export const Sidebar = ({ role, userName, userAvatar }: SidebarProps) => {
           {showUserMenu && (
             <div className="absolute bottom-full left-0 right-0 mb-2 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden animate-in slide-in-from-bottom-2 duration-200">
               <Link
-                href="#"
+                href={profilePath}
                 className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors"
                 onClick={() => setShowUserMenu(false)}
               >
                 <Settings className="w-4 h-4 text-slate-600" />
-                <span className="text-sm text-slate-700 font-medium">Pengaturan</span>
+                <span className="text-sm text-slate-700 font-medium">Pengaturan / Profil</span>
               </Link>
               <button
                 onClick={() => {

@@ -2,8 +2,9 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { GlassButton } from "@/components/atoms/glass-button"
-import { GraduationCap, Menu, X } from "lucide-react"
+import { Menu, X } from "lucide-react"
 
 interface NavLink {
   href: string
@@ -31,10 +32,14 @@ export function PublicNavbar({
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl group-hover:scale-105 transition-transform shadow-lg shadow-blue-500/30">
-              <GraduationCap className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-xl font-bold text-white">EduGlass</span>
+            <Image
+              src="/AegixLogo.png"
+              alt="Aegix SLE Logo"
+              width={40}
+              height={40}
+              className="w-10 h-10 rounded-xl group-hover:scale-105 transition-transform shadow-lg shadow-blue-500/30"
+            />
+            <span className="text-xl font-bold text-white">Aegix SLE</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -58,9 +63,9 @@ export function PublicNavbar({
                   Masuk
                 </GlassButton>
               </Link>
-              <Link href="/register">
+              <Link href="/login">
                 <GlassButton size="sm">
-                  Daftar
+                  Mulai
                 </GlassButton>
               </Link>
             </div>
@@ -114,9 +119,9 @@ export function PublicNavbar({
                       Masuk
                     </GlassButton>
                   </Link>
-                  <Link href="/register" className="flex-1" onClick={() => setIsMenuOpen(false)}>
+                  <Link href="/login" className="flex-1" onClick={() => setIsMenuOpen(false)}>
                     <GlassButton className="w-full justify-center">
-                      Daftar
+                      Mulai
                     </GlassButton>
                   </Link>
                 </div>

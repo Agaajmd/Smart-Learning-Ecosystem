@@ -20,6 +20,7 @@ export function BottomSheet({
   const [mounted, setMounted] = React.useState(false)
   const [isClosing, setIsClosing] = React.useState(false)
   const sheetRef = React.useRef<HTMLDivElement>(null)
+  const closeTimerRef = React.useRef<number | null>(null)
   const startYRef = React.useRef(0)
   const currentYRef = React.useRef(0)
 
@@ -31,21 +32,35 @@ export function BottomSheet({
     if (open) {
       document.body.style.overflow = 'hidden'
       setIsClosing(false)
+      if (sheetRef.current) {
+        sheetRef.current.style.transform = ''
+      }
     } else {
       document.body.style.overflow = ''
     }
     return () => {
       document.body.style.overflow = ''
+      if (closeTimerRef.current !== null) {
+        window.clearTimeout(closeTimerRef.current)
+        closeTimerRef.current = null
+      }
     }
   }, [open])
 
   const handleClose = React.useCallback(() => {
+    if (isClosing || !open) {
+      return
+    }
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current)
+    }
     setIsClosing(true)
-    setTimeout(() => {
+    closeTimerRef.current = window.setTimeout(() => {
       onOpenChange(false)
       setIsClosing(false)
+      closeTimerRef.current = null
     }, 300)
-  }, [onOpenChange])
+  }, [isClosing, onOpenChange, open])
 
   const handleTouchStart = (e: React.TouchEvent) => {
     startYRef.current = e.touches[0].clientY

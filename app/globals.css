@@ -138,12 +138,14 @@ button,
 input,
 select,
 textarea {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition-property: color, background-color, border-color, opacity, transform, box-shadow;
+  transition-duration: 0.2s;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Smooth page transitions */
+/* Avoid re-run animation on every route mount to reduce visual blink */
 main {
-  animation: fadeIn 0.4s ease-out;
+  animation: none;
 }
 
 @keyframes fadeIn {
@@ -205,27 +207,11 @@ main {
 /* Professional gradient background */
 .liquid-glass-bg {
   background: linear-gradient(
-    135deg,
-    oklch(0.95 0.02 220) 0%,
-    oklch(0.97 0.01 240) 25%,
-    oklch(0.98 0.005 230) 50%,
-    oklch(0.96 0.015 235) 75%,
-    oklch(0.95 0.02 220) 100%
+    160deg,
+    #ffffff 0%,
+    #f3f8ff 45%,
+    #e8f1ff 100%
   );
-  background-size: 400% 400%;
-  animation: gradient-shift 20s ease infinite;
-}
-
-@keyframes gradient-shift {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
 }
 
 /* Glass morphism utility classes */
@@ -245,7 +231,9 @@ main {
 
 /* Smooth hover effects for glass cards */
 .glass-hover {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition-property: transform, box-shadow, background-color, border-color;
+  transition-duration: 0.3s;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .glass-hover:hover {
@@ -358,7 +346,15 @@ main {
 }
 
 .page-enter {
-  animation: pageEnter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  animation: pageEnter 0.12s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter,
+  .animate-fade-in,
+  .animate-stagger > * {
+    animation: none !important;
+  }
 }
 
 /* Toast animations */
@@ -407,7 +403,7 @@ main {
 
 /* Sonner toast custom styles for smooth animations */
 [data-sonner-toaster] [data-sonner-toast] {
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
 [data-sonner-toaster] [data-sonner-toast][data-mounted="true"] {
@@ -418,7 +414,7 @@ main {
 [data-sonner-toaster] [data-sonner-toast][data-removed="true"] {
   --y: translateY(-100%);
   opacity: 0;
-  transition: all 0.4s cubic-bezier(0.06, 0.71, 0.55, 1) !important;
+  transition: transform 0.4s cubic-bezier(0.06, 0.71, 0.55, 1), opacity 0.4s cubic-bezier(0.06, 0.71, 0.55, 1) !important;
 }
 
 [data-sonner-toaster] [data-sonner-toast][data-visible="false"] {

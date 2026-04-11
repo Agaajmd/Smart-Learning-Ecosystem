@@ -75,6 +75,8 @@ export interface Task {
   dueDate: string
   createdAt: string
   attachmentUrl?: string
+  attachmentName?: string
+  imageUrl?: string
   maxScore: number
 }
 
@@ -84,6 +86,7 @@ export interface TaskSubmission {
   studentId: string
   submittedAt: string
   attachmentUrl?: string
+  imageUrl?: string
   attachmentName?: string
   score?: number
   feedback?: string
@@ -863,6 +866,8 @@ export const mockTasks: Task[] = [
     teacherId: "e1",
     dueDate: "2025-12-25",
     createdAt: "2025-12-20",
+    attachmentUrl: "https://example.com/modul-matematika-linear",
+    imageUrl: "/asian-male-teacher-professional.jpg",
     maxScore: 100,
   },
   {
@@ -895,6 +900,8 @@ export const mockTaskSubmissions: TaskSubmission[] = [
     taskId: "t1",
     studentId: "s1",
     submittedAt: "2025-12-23",
+    attachmentUrl: "https://docs.example.com/hasil-andi-linear",
+    imageUrl: "/asian-boy-student.jpg",
     attachmentName: "tugas_matematika_andi.pdf",
     score: 85,
     feedback: "Bagus! Langkah-langkah sudah jelas.",

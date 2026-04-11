@@ -4,7 +4,7 @@ import { MetadataRoute } from 'next'
 export const dynamic = "force-static"
 
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = 'https://school-management.app'
+  const baseUrl = 'https://aegix-sle.app'
 
   return {
     rules: [
@@ -12,35 +12,24 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: '*',
         allow: [
           '/',
-          '/login',
-          '/register',
         ],
         disallow: [
           '/api/',
           '/_next/',
+          '/login',
           '/admin/*',
           '/employee/*',
           '/student/*',
+          '/parent/*',
+          '/canteen/*',
+          '/canteen-owner/*',
           '/super-admin/*',
         ],
       },
       {
         userAgent: 'Googlebot',
-        allow: [
-          '/',
-          '/login',
-          '/register',
-        ],
-        disallow: ['/api/', '/_next/'],
-      },
-      {
-        userAgent: 'Bingbot',
-        allow: [
-          '/',
-          '/login',
-          '/register',
-        ],
-        disallow: ['/api/', '/_next/'],
+        allow: ['/'],
+        disallow: ['/api/', '/_next/', '/login', '/*?*'],
       },
     ],
     sitemap: `${baseUrl}/sitemap.xml`,
