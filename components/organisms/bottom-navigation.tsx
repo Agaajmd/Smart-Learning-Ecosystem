@@ -44,6 +44,7 @@ interface NavItem {
   icon: ComponentType<{ className?: string }>
   label: string
   activeMatch?: string
+  exact?: boolean
 }
 
 export const BottomNavigation = ({ role, userName, userAvatar }: BottomNavigationProps) => {
@@ -58,42 +59,42 @@ export const BottomNavigation = ({ role, userName, userAvatar }: BottomNavigatio
     switch (role) {
       case "STUDENT":
         return [
-          { href: "/student", icon: Home, label: "Home" },
+          { href: "/student", icon: Home, label: "Home", exact: true },
           { href: "/student/class", icon: LayoutGrid, label: "Kelas" },
           { href: "/student/assignments", icon: FileText, label: "Tugas" },
           { href: "/canteen", icon: Utensils, label: "Kantin" },
         ]
       case "EMPLOYEE":
         return [
-          { href: "/employee", icon: Home, label: "Home" },
+          { href: "/employee", icon: Home, label: "Home", exact: true },
           { href: "/employee/assignments", icon: FileText, label: "Tugas" },
           { href: "/employee/class/c1", icon: LayoutGrid, label: "Kelas", activeMatch: "/employee/class" },
           { href: "/employee/grades", icon: Award, label: "Poin" },
         ]
       case "ADMIN":
         return [
-          { href: "/admin", icon: Home, label: "Home" },
+          { href: "/admin", icon: Home, label: "Home", exact: true },
           { href: "/admin/class", icon: LayoutGrid, label: "Kelas" },
           { href: "/admin/scan", icon: QrCode, label: "Scan" },
           { href: "/admin/users", icon: Users, label: "Users" },
         ]
       case "SUPER_ADMIN":
         return [
-          { href: "/super-admin", icon: Home, label: "Home" },
+          { href: "/super-admin", icon: Home, label: "Home", exact: true },
           { href: "/super-admin/finance", icon: BarChart3, label: "Keuangan" },
           { href: "/super-admin/staff", icon: Users, label: "Staff", activeMatch: "/super-admin/staff" },
           { href: "/canteen", icon: Utensils, label: "Kantin" },
         ]
       case "PARENT":
         return [
-          { href: "/parent", icon: Home, label: "Home" },
+          { href: "/parent", icon: Home, label: "Home", exact: true },
           { href: "/parent/class", icon: LayoutGrid, label: "Kelas" },
           { href: "/parent/finance", icon: Wallet, label: "Keuangan" },
           { href: "/parent/grades", icon: BookOpen, label: "Nilai" },
         ]
       case "CANTEEN_OWNER":
         return [
-          { href: "/canteen-owner", icon: Home, label: "Home" },
+          { href: "/canteen-owner", icon: Home, label: "Home", exact: true },
           { href: "/canteen-owner/products", icon: Package, label: "Produk" },
           { href: "/canteen-owner/orders", icon: ShoppingBag, label: "Order" },
           { href: "/canteen-owner/finance", icon: TrendingUp, label: "Keuangan" },
@@ -167,14 +168,28 @@ export const BottomNavigation = ({ role, userName, userAvatar }: BottomNavigatio
   const navItems = useMemo(() => getNavItems(), [role])
   const allMenuItems = useMemo(() => getAllMenuItems(), [role])
 
+  const normalizePath = useCallback((value: string) => {
+    if (!value) return "/"
+    const trimmed = value.endsWith("/") && value !== "/" ? value.slice(0, -1) : value
+    return trimmed || "/"
+  }, [])
+
   const isRouteActive = useCallback(
     (item: NavItem) => {
+      const current = normalizePath(pathname)
       if (item.activeMatch) {
-        return pathname === item.activeMatch || pathname.startsWith(`${item.activeMatch}/`)
+        const match = normalizePath(item.activeMatch)
+        return current === match || current.startsWith(`${match}/`)
       }
-      return pathname === item.href
+
+      const target = normalizePath(item.href)
+      if (item.exact) {
+        return current === target
+      }
+
+      return current === target || current.startsWith(`${target}/`)
     },
-    [pathname],
+    [normalizePath, pathname],
   )
 
   useEffect(() => {

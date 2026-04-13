@@ -10,10 +10,9 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: '*',
-        allow: ['/', '/canteen'],
+        allow: ['/', '/canteen', '/AegixLogo.png', '/icon-192x192.png', '/icon-512x512.png'],
         disallow: [
           '/api/',
-          '/_next/',
           '/login',
           '/register',
           '/admin/*',
@@ -28,8 +27,13 @@ export default function robots(): MetadataRoute.Robots {
       },
       {
         userAgent: 'Googlebot',
-        allow: ['/', '/canteen'],
-        disallow: ['/api/', '/_next/', '/login', '/register', '/*?*'],
+        allow: ['/', '/canteen', '/AegixLogo.png', '/icon-192x192.png', '/icon-512x512.png'],
+        disallow: ['/api/', '/login', '/register', '/*?*'],
+      },
+      {
+        userAgent: 'Googlebot-Image',
+        allow: ['/', '/canteen', '/*.png', '/*.jpg', '/*.jpeg', '/*.webp', '/*.svg'],
+        disallow: ['/api/', '/login', '/register'],
       },
     ],
     sitemap: `${baseUrl}/sitemap.xml`,
