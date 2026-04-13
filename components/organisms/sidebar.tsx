@@ -60,6 +60,7 @@ export const Sidebar = ({ role, userName, userAvatar }: SidebarProps) => {
           { href: "/employee/assignments", icon: FileText, label: "Kelola Tugas" },
           { href: "/employee/schedule", icon: Calendar, label: "Jadwal" },
           { href: "/employee/class/c1", icon: LayoutGrid, label: "Kelas" },
+          { href: "/employee/grades", icon: Award, label: "Poin Keaktifan" },
           { href: "/employee/rapor", icon: BookOpen, label: "AI Rapor" },
           { href: "/canteen", icon: Utensils, label: "Kantin" },
         ]

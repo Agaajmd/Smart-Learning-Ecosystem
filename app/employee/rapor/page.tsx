@@ -4,16 +4,18 @@ import { useState, useMemo } from "react"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
 import { GlassCard } from "@/components/molecules/glass-card"
 import { GlassButton } from "@/components/atoms/glass-button"
-import { mockEmployees, mockStudents, mockClasses } from "@/lib/mock-data"
+import { mockEmployees, mockStudents, mockClasses, type StudentGrade } from "@/lib/mock-data"
+import { getStoredStudentGrades, setStoredStudentGrades } from "@/lib/academic-storage"
 import { Save, Download, ChevronDown, Users, Calculator, Award, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
-interface StudentGrade {
+interface EditableStudentGrade {
   studentId: string
   participation: string
   assignment: string
   exam: string
+  notes: string
 }
 
 const getPredicate = (score: number): { letter: string; color: string } => {
@@ -32,12 +34,13 @@ export default function GradingPage() {
   const classStudents = mockStudents.filter(s => s.classId === selectedClassId)
   
   // Initialize grades for all students
-  const [grades, setGrades] = useState<StudentGrade[]>(
+  const [grades, setGrades] = useState<EditableStudentGrade[]>(
     classStudents.map(student => ({
       studentId: student.id,
       participation: "",
       assignment: "",
-      exam: ""
+      exam: "",
+      notes: "",
     }))
   )
 
@@ -50,7 +53,8 @@ export default function GradingPage() {
       studentId: student.id,
       participation: "",
       assignment: "",
-      exam: ""
+      exam: "",
+      notes: "",
     })))
   }
 
@@ -60,7 +64,14 @@ export default function GradingPage() {
     return !isNaN(num) && num >= 0 && num <= 100
   }
 
-  const handleGradeChange = (studentId: string, field: keyof Omit<StudentGrade, 'studentId'>, value: string) => {
+  const handleGradeChange = (studentId: string, field: keyof Omit<EditableStudentGrade, 'studentId'>, value: string) => {
+    if (field === "notes") {
+      setGrades(prev => prev.map(g => 
+        g.studentId === studentId ? { ...g, notes: value } : g
+      ))
+      return
+    }
+
     // Only allow numbers
     if (value !== "" && !/^\d*$/.test(value)) return
     
@@ -75,7 +86,7 @@ export default function GradingPage() {
     ))
   }
 
-  const calculateFinalScore = (grade: StudentGrade): number | null => {
+  const calculateFinalScore = (grade: EditableStudentGrade): number | null => {
     const p = grade.participation ? parseInt(grade.participation) : null
     const a = grade.assignment ? parseInt(grade.assignment) : null
     const e = grade.exam ? parseInt(grade.exam) : null
@@ -104,6 +115,34 @@ export default function GradingPage() {
       toast.error(`Masih ada ${incompleteCount} siswa yang belum lengkap nilainya`)
       return
     }
+    const toStoredGrade = (grade: EditableStudentGrade): StudentGrade => {
+      const participation = Number(grade.participation)
+      const assignment = Number(grade.assignment)
+      const exam = Number(grade.exam)
+      const finalScore = calculateFinalScore(grade) ?? 0
+      const attitude: StudentGrade["attitude"] = finalScore >= 90 ? "A" : finalScore >= 80 ? "B" : finalScore >= 70 ? "C" : "D"
+
+      return {
+        id: `sg-ai-${grade.studentId}-${employee.id}`,
+        studentId: grade.studentId,
+        subject: employee.subject,
+        teacherId: employee.id,
+        semester: "Ganjil 2025",
+        knowledge: Math.round((participation + assignment) / 2),
+        skill: exam,
+        attitude,
+        notes: grade.notes.trim(),
+      }
+    }
+
+    const allStored = getStoredStudentGrades()
+    const classStudentIds = new Set(classStudents.map((student) => student.id))
+    const baseStored = allStored.filter(
+      (grade) => !(grade.teacherId === employee.id && grade.subject === employee.subject && classStudentIds.has(grade.studentId))
+    )
+    const merged = [...baseStored, ...grades.map(toStoredGrade)]
+    setStoredStudentGrades(merged)
+
     toast.success("Nilai berhasil disimpan!", {
       description: `${grades.length} siswa telah dinilai`
     })
@@ -195,7 +234,7 @@ export default function GradingPage() {
         {/* Grading Table */}
         <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[600px]">
+            <table className="w-full min-w-[760px]">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
                   <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">No</th>
@@ -214,6 +253,7 @@ export default function GradingPage() {
                   </th>
                   <th className="text-center py-3 px-4 text-sm font-semibold text-slate-700">Nilai Akhir</th>
                   <th className="text-center py-3 px-4 text-sm font-semibold text-slate-700">Predikat</th>
+                  <th className="text-left py-3 px-4 text-sm font-semibold text-slate-700">Catatan AI Rapor</th>
                 </tr>
               </thead>
               <tbody>
@@ -298,6 +338,15 @@ export default function GradingPage() {
                         ) : (
                           <span className="text-slate-300">-</span>
                         )}
+                      </td>
+                      <td className="py-2 px-4">
+                        <input
+                          type="text"
+                          value={grade.notes}
+                          onChange={(e) => handleGradeChange(student.id, "notes", e.target.value)}
+                          placeholder="Catatan singkat untuk orang tua"
+                          className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
+                        />
                       </td>
                     </tr>
                   )
