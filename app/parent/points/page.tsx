@@ -7,9 +7,9 @@ import {
   mockParents,
   mockClasses,
   getChildrenByParent,
-  getActivityPointsByStudent,
   type Student,
 } from "@/lib/mock-data"
+import { getStoredActivityPointsByStudent } from "@/lib/academic-storage"
 import { 
   ArrowLeft,
   TrendingUp,
@@ -26,7 +26,7 @@ export default function ParentPointsPage() {
   const [selectedChild, setSelectedChild] = useState<Student>(children[0])
   const [filterType, setFilterType] = useState<string>("all")
 
-  const activityPoints = getActivityPointsByStudent(selectedChild.id)
+  const activityPoints = getStoredActivityPointsByStudent(selectedChild.id)
   const filteredPoints = filterType === "all" 
     ? activityPoints 
     : activityPoints.filter(p => p.type === filterType)

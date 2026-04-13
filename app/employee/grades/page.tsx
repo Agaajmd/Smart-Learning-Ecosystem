@@ -12,9 +12,11 @@ import {
   mockEmployees, 
   mockClasses,
   mockStudents,
-  mockStudentGrades,
-  StudentGrade
+  type ActivityPoint,
+  type StudentGrade
 } from "@/lib/mock-data"
+import { addStoredActivityPoint, getStoredGradesByTeacher, setStoredStudentGrades, getStoredStudentGrades } from "@/lib/academic-storage"
+import { cn } from "@/lib/utils"
 import { 
   FileText, 
   Users,
@@ -26,7 +28,9 @@ import {
   Award,
   BookOpen,
   GraduationCap,
-  Plus
+  Plus,
+  TrendingDown,
+  Sparkles,
 } from "lucide-react"
 
 const ATTITUDES = ["A", "B", "C", "D"] as const
@@ -36,10 +40,17 @@ export default function TeacherRaporPage() {
   const homeroomClass = mockClasses.find(c => c.id === teacher.homeroomClassId)
   const classStudents = mockStudents.filter(s => s.classId === teacher.homeroomClassId)
   
-  const [grades, setGrades] = useState<StudentGrade[]>([...mockStudentGrades])
+  const [grades, setGrades] = useState<StudentGrade[]>(() => getStoredGradesByTeacher(teacher.id))
   const [searchQuery, setSearchQuery] = useState("")
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedStudent, setSelectedStudent] = useState<typeof mockStudents[0] | null>(null)
+  const [activityForm, setActivityForm] = useState({
+    studentId: classStudents[0]?.id ?? "",
+    type: "POSITIVE" as ActivityPoint["type"],
+    category: "Akademik",
+    points: 5,
+    description: "",
+  })
 
   const [editForm, setEditForm] = useState({
     subject: teacher.subject,
@@ -68,10 +79,10 @@ export default function TeacherRaporPage() {
   }
 
   const getGradeColor = (avg: number) => {
-    if (avg >= 85) return "text-green-400"
-    if (avg >= 70) return "text-blue-400"
-    if (avg >= 60) return "text-yellow-400"
-    return "text-red-400"
+    if (avg >= 85) return "text-emerald-600"
+    if (avg >= 70) return "text-blue-600"
+    if (avg >= 60) return "text-amber-600"
+    return "text-rose-600"
   }
 
   const getGradeBadge = (avg: number) => {
@@ -79,6 +90,19 @@ export default function TeacherRaporPage() {
     if (avg >= 70) return { label: "Baik", color: "blue" }
     if (avg >= 60) return { label: "Cukup", color: "yellow" }
     return { label: "Kurang", color: "red" }
+  }
+
+  const getBadgeClasses = (color: string) => {
+    switch (color) {
+      case "green":
+        return "bg-emerald-50 text-emerald-700 border border-emerald-200"
+      case "blue":
+        return "bg-blue-50 text-blue-700 border border-blue-200"
+      case "yellow":
+        return "bg-amber-50 text-amber-700 border border-amber-200"
+      default:
+        return "bg-rose-50 text-rose-700 border border-rose-200"
+    }
   }
 
   const handleOpenEdit = (student: typeof mockStudents[0]) => {
@@ -116,8 +140,9 @@ export default function TeacherRaporPage() {
       g => g.studentId === selectedStudent.id && g.subject === teacher.subject && g.teacherId === teacher.id
     )
     
+    let nextGrades: StudentGrade[]
     if (existingIndex >= 0) {
-      setGrades(grades.map((g, i) => 
+      nextGrades = grades.map((g, i) => 
         i === existingIndex 
           ? { 
               ...g, 
@@ -127,7 +152,7 @@ export default function TeacherRaporPage() {
               notes: editForm.notes,
             }
           : g
-      ))
+      )
     } else {
       const newGrade: StudentGrade = {
         id: `sg${Date.now()}`,
@@ -140,11 +165,44 @@ export default function TeacherRaporPage() {
         attitude: editForm.attitude,
         notes: editForm.notes,
       }
-      setGrades([...grades, newGrade])
+      nextGrades = [...grades, newGrade]
     }
+
+    setGrades(nextGrades)
+
+    const allGrades = getStoredStudentGrades().filter((g) => g.teacherId !== teacher.id)
+    setStoredStudentGrades([...allGrades, ...nextGrades])
 
     toast.success("Nilai berhasil disimpan")
     setShowEditModal(false)
+  }
+
+  const handleAddActivityPoint = () => {
+    if (!activityForm.studentId || !activityForm.category || !activityForm.description.trim()) {
+      toast.error("Lengkapi data poin aktivitas terlebih dahulu")
+      return
+    }
+
+    if (activityForm.points <= 0) {
+      toast.error("Poin harus lebih dari 0")
+      return
+    }
+
+    const signedPoints = activityForm.type === "NEGATIVE" ? -Math.abs(activityForm.points) : Math.abs(activityForm.points)
+    const newPoint: ActivityPoint = {
+      id: `ap-${Date.now()}`,
+      studentId: activityForm.studentId,
+      type: activityForm.type,
+      category: activityForm.category,
+      points: signedPoints,
+      description: activityForm.description.trim(),
+      date: new Date().toISOString().slice(0, 10),
+      givenBy: teacher.id,
+    }
+
+    addStoredActivityPoint(newPoint)
+    toast.success("Poin aktivitas berhasil ditambahkan")
+    setActivityForm((prev) => ({ ...prev, description: "", points: 5 }))
   }
 
   // Stats
@@ -170,48 +228,48 @@ export default function TeacherRaporPage() {
       <div className="w-full max-w-4xl mx-auto space-y-4 sm:space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-white">Nilai Rapor Siswa</h1>
-          <p className="text-sm text-white/60">
-            {homeroomClass ? `Wali Kelas ${homeroomClass.name} - ${teacher.subject}` : "Kelola nilai rapor siswa"}
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Penilaian & Poin Keaktifan</h1>
+          <p className="text-sm text-slate-500">
+            {homeroomClass ? `Wali Kelas ${homeroomClass.name} - ${teacher.subject}` : "Kelola nilai dan poin aktivitas siswa"}
           </p>
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
           <GlassCard className="text-center py-4">
-            <Users className="w-5 h-5 mx-auto mb-2 text-blue-400" />
-            <p className="text-xl font-bold text-white">{classStudents.length}</p>
-            <p className="text-xs text-white/60">Total Siswa</p>
+            <Users className="w-5 h-5 mx-auto mb-2 text-blue-600" />
+            <p className="text-xl font-bold text-slate-800">{classStudents.length}</p>
+            <p className="text-xs text-slate-500">Total Siswa</p>
           </GlassCard>
           <GlassCard className="text-center py-4">
-            <FileText className="w-5 h-5 mx-auto mb-2 text-purple-400" />
-            <p className="text-xl font-bold text-white">{studentsWithGrades.length}</p>
-            <p className="text-xs text-white/60">Sudah Dinilai</p>
+            <FileText className="w-5 h-5 mx-auto mb-2 text-violet-600" />
+            <p className="text-xl font-bold text-slate-800">{studentsWithGrades.length}</p>
+            <p className="text-xs text-slate-500">Sudah Dinilai</p>
           </GlassCard>
           <GlassCard className="text-center py-4">
-            <TrendingUp className="w-5 h-5 mx-auto mb-2 text-green-400" />
+            <TrendingUp className="w-5 h-5 mx-auto mb-2 text-emerald-600" />
             <p className={`text-xl font-bold ${getGradeColor(avgClassScore)}`}>{avgClassScore || "-"}</p>
-            <p className="text-xs text-white/60">Rata-rata Kelas</p>
+            <p className="text-xs text-slate-500">Rata-rata Kelas</p>
           </GlassCard>
         </div>
 
         {/* Top Students */}
         {topStudents.length > 0 && (
-          <GlassCard className="bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border-yellow-500/20">
+          <GlassCard className="bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
             <div className="flex items-center gap-2 mb-3">
-              <Award className="w-5 h-5 text-yellow-400" />
-              <h2 className="font-semibold text-white">Peringkat Teratas</h2>
+              <Award className="w-5 h-5 text-amber-600" />
+              <h2 className="font-semibold text-slate-800">Peringkat Teratas</h2>
             </div>
             <div className="flex gap-3 overflow-x-auto pb-2">
               {topStudents.map((item, index) => (
-                <div key={item.student.id} className="flex items-center gap-3 p-2 bg-white/5 rounded-xl min-w-fit">
-                  <span className={`text-lg font-bold ${index === 0 ? 'text-yellow-400' : index === 1 ? 'text-gray-300' : 'text-orange-400'}`}>
+                <div key={item.student.id} className="flex items-center gap-3 p-2 bg-white rounded-xl border border-slate-200 min-w-fit">
+                  <span className={`text-lg font-bold ${index === 0 ? 'text-amber-600' : index === 1 ? 'text-slate-500' : 'text-orange-600'}`}>
                     #{index + 1}
                   </span>
                   <img src={item.student.avatar} alt={item.student.name} className="w-8 h-8 rounded-full object-cover" />
                   <div>
-                    <p className="text-sm font-medium text-white">{item.student.name}</p>
-                    <p className="text-xs text-white/60">Nilai: {Math.round(item.avg)}</p>
+                    <p className="text-sm font-medium text-slate-800">{item.student.name}</p>
+                    <p className="text-xs text-slate-500">Nilai: {Math.round(item.avg)}</p>
                   </div>
                 </div>
               ))}
@@ -221,20 +279,109 @@ export default function TeacherRaporPage() {
 
         {/* Search */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
             placeholder="Cari siswa..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
+
+        {/* Activity Points Input */}
+        <GlassCard className="space-y-4 border-blue-200 bg-blue-50/50">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-blue-600" />
+            <h2 className="text-lg font-semibold text-slate-800">Input Poin Aktivitas Siswa</h2>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm text-slate-600 mb-1.5 block">Siswa</label>
+              <select
+                value={activityForm.studentId}
+                onChange={(e) => setActivityForm({ ...activityForm, studentId: e.target.value })}
+                className="w-full px-3 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {classStudents.map((student) => (
+                  <option key={student.id} value={student.id} className="text-slate-800">
+                    {student.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm text-slate-600 mb-1.5 block">Kategori</label>
+              <input
+                type="text"
+                value={activityForm.category}
+                onChange={(e) => setActivityForm({ ...activityForm, category: e.target.value })}
+                className="w-full px-3 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Akademik / Kedisiplinan / Sosial"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm text-slate-600 mb-1.5 block">Jenis Poin</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setActivityForm({ ...activityForm, type: "POSITIVE" })}
+                  className={cn(
+                    "py-2 rounded-xl text-sm font-medium transition-colors",
+                    activityForm.type === "POSITIVE" ? "bg-emerald-500 text-white" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                  )}
+                >
+                  Positif
+                </button>
+                <button
+                  onClick={() => setActivityForm({ ...activityForm, type: "NEGATIVE" })}
+                  className={cn(
+                    "py-2 rounded-xl text-sm font-medium transition-colors",
+                    activityForm.type === "NEGATIVE" ? "bg-rose-500 text-white" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                  )}
+                >
+                  Negatif
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm text-slate-600 mb-1.5 block">Nilai Poin</label>
+              <input
+                type="number"
+                min={1}
+                value={activityForm.points}
+                onChange={(e) => setActivityForm({ ...activityForm, points: Number(e.target.value) || 0 })}
+                className="w-full px-3 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm text-slate-600 mb-1.5 block">Deskripsi Aktivitas</label>
+            <textarea
+              value={activityForm.description}
+              onChange={(e) => setActivityForm({ ...activityForm, description: e.target.value })}
+              rows={2}
+              className="w-full px-3 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Contoh: Membantu teman memahami materi saat diskusi kelas"
+            />
+          </div>
+
+          <div className="flex justify-end">
+            <GlassButton onClick={handleAddActivityPoint} className="justify-center">
+              {activityForm.type === "POSITIVE" ? <TrendingUp className="w-4 h-4 mr-2" /> : <TrendingDown className="w-4 h-4 mr-2" />}
+              Simpan Poin Aktivitas
+            </GlassButton>
+          </div>
+        </GlassCard>
 
         {/* Student List */}
         <GlassCard>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-white">Daftar Nilai - {teacher.subject}</h2>
+            <h2 className="text-lg font-semibold text-slate-800">Daftar Nilai - {teacher.subject}</h2>
           </div>
 
           <div className="space-y-2">
@@ -246,7 +393,7 @@ export default function TeacherRaporPage() {
               return (
                 <div 
                   key={student.id} 
-                  className="flex items-center gap-3 p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-all"
+                  className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl hover:bg-white transition-all"
                 >
                   <img 
                     src={student.avatar} 
@@ -254,22 +401,22 @@ export default function TeacherRaporPage() {
                     className="w-10 h-10 rounded-full object-cover"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-white truncate">{student.name}</p>
-                    <p className="text-xs text-white/50">{student.email}</p>
+                    <p className="font-medium text-slate-800 truncate">{student.name}</p>
+                    <p className="text-xs text-slate-500">{student.email}</p>
                   </div>
 
                   {studentGrade ? (
                     <div className="flex items-center gap-3">
                       <div className="text-right hidden sm:block">
-                        <p className="text-xs text-white/50">Pengetahuan / Keterampilan</p>
-                        <p className="text-sm font-medium text-white">{studentGrade.knowledge} / {studentGrade.skill}</p>
+                        <p className="text-xs text-slate-500">Pengetahuan / Keterampilan</p>
+                        <p className="text-sm font-medium text-slate-700">{studentGrade.knowledge} / {studentGrade.skill}</p>
                       </div>
-                      <div className={`px-2 py-1 rounded-full text-xs bg-${badge.color}-500/20 text-${badge.color}-300`}>
+                      <div className={cn("px-2 py-1 rounded-full text-xs font-semibold", getBadgeClasses(badge.color))}>
                         {Math.round(avg)}
                       </div>
                     </div>
                   ) : (
-                    <span className="text-xs text-white/40">Belum dinilai</span>
+                    <span className="text-xs text-slate-400">Belum dinilai</span>
                   )}
 
                   <GlassButton size="sm" onClick={() => handleOpenEdit(student)}>

@@ -4,7 +4,7 @@ import { DashboardLayout } from "@/components/templates/dashboard-layout"
 import { GlassCard } from "@/components/molecules/glass-card"
 import { AttendanceLeaderboard } from "@/components/organisms/attendance-leaderboard"
 import { mockEmployees, mockSchedule } from "@/lib/mock-data"
-import { Calendar, LayoutGrid, BookOpen, Users } from "lucide-react"
+import { Calendar, LayoutGrid, BookOpen, Users, Award } from "lucide-react"
 import Link from "next/link"
 
 export default function EmployeeDashboard() {
@@ -19,6 +19,7 @@ export default function EmployeeDashboard() {
       description: "Lihat jadwal mingguan Anda",
     },
     { href: "/employee/class/c1", icon: LayoutGrid, label: "Kelas Saya", description: "Kelola kehadiran siswa" },
+    { href: "/employee/grades", icon: Award, label: "Poin Keaktifan", description: "Input poin aktivitas siswa" },
     { href: "/employee/rapor", icon: BookOpen, label: "AI Rapor", description: "Generate laporan siswa" },
   ]
 

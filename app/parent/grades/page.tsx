@@ -8,9 +8,9 @@ import {
   mockClasses,
   mockEmployees,
   getChildrenByParent,
-  getGradesByStudent,
   type Student,
 } from "@/lib/mock-data"
+import { getStoredGradesByStudent } from "@/lib/academic-storage"
 import { 
   ArrowLeft,
   BookOpen,
@@ -25,7 +25,7 @@ export default function ParentGradesPage() {
   const children = getChildrenByParent(parent.id)
   const [selectedChild, setSelectedChild] = useState<Student>(children[0])
 
-  const grades = getGradesByStudent(selectedChild.id)
+  const grades = getStoredGradesByStudent(selectedChild.id)
   
   const averageKnowledge = grades.length > 0 
     ? Math.round(grades.reduce((acc, g) => acc + g.knowledge, 0) / grades.length)

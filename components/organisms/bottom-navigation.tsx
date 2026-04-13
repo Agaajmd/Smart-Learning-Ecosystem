@@ -61,7 +61,7 @@ export const BottomNavigation = ({ role, userName, userAvatar }: BottomNavigatio
           { href: "/employee", icon: Home, label: "Home" },
           { href: "/employee/assignments", icon: FileText, label: "Tugas" },
           { href: "/employee/class/c1", icon: LayoutGrid, label: "Kelas" },
-          { href: "/canteen", icon: Utensils, label: "Kantin" },
+          { href: "/employee/grades", icon: Award, label: "Poin" },
         ]
       case "ADMIN":
         return [
@@ -114,6 +114,7 @@ export const BottomNavigation = ({ role, userName, userAvatar }: BottomNavigatio
           { href: "/employee/assignments", icon: FileText, label: "Kelola Tugas" },
           { href: "/employee/schedule", icon: Calendar, label: "Jadwal" },
           { href: "/employee/class/c1", icon: LayoutGrid, label: "Kelas" },
+          { href: "/employee/grades", icon: Award, label: "Poin Keaktifan" },
           { href: "/employee/rapor", icon: BookOpen, label: "AI Rapor" },
           { href: "/canteen", icon: Utensils, label: "Kantin" },
         ]
