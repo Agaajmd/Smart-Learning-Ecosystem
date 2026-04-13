@@ -50,18 +50,18 @@ export const metadata: Metadata = {
     images: ["/AegixLogo.png"],
   },
   robots: {
-    index: false,
-    follow: false,
-    nocache: true,
-    noarchive: true,
-    nosnippet: true,
+    index: true,
+    follow: true,
+    nocache: false,
+    noarchive: false,
+    nosnippet: false,
     googleBot: {
-      index: false,
-      follow: false,
-      noimageindex: true,
-      "max-video-preview": 0,
-      "max-image-preview": "none",
-      "max-snippet": 0,
+      index: true,
+      follow: true,
+      noimageindex: false,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
     },
   },
   icons: {
@@ -87,6 +87,7 @@ export const viewport: Viewport = {
   themeColor: "#1d4ed8",
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
 }
 
 export default function RootLayout({

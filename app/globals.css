@@ -138,9 +138,15 @@ button,
 input,
 select,
 textarea {
-  transition-property: color, background-color, border-color, opacity, transform, box-shadow;
-  transition-duration: 0.2s;
+  transition-property: color, background-color, border-color, opacity;
+  transition-duration: 0.16s;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Keep motion smooth while avoiding heavy composite work during scroll */
+.perf-scroll-section {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 900px;
 }
 
 /* Avoid re-run animation on every route mount to reduce visual blink */
@@ -518,6 +524,7 @@ main {
   top: auto !important;
   bottom: 0 !important;
   transform-origin: bottom center;
+  will-change: transform;
 }
 
 /* Ensure drawer overlay has smooth animation */
@@ -528,4 +535,13 @@ main {
 /* Body styling when drawer is open */
 body[vaul-drawer-wrapper] {
   transition: transform 0.5s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@media (pointer: coarse), (max-width: 768px) {
+  /* Lower blur cost on mobile GPUs to reduce scroll jank. */
+  .glass,
+  .glass-dark {
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
 }

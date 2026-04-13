@@ -1,18 +1,17 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import type { ReactNode } from "react"
+import type { HTMLAttributes, ReactNode } from "react"
 
-interface GlassCardProps {
+interface GlassCardProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode
-  className?: string
-  onClick?: () => void
   hover?: boolean
 }
 
-export const GlassCard = ({ children, className, onClick, hover = false }: GlassCardProps) => {
+export const GlassCard = ({ children, className, onClick, hover = false, ...props }: GlassCardProps) => {
   return (
     <div
+      {...props}
       onClick={onClick}
       className={cn(
         "bg-white/80 backdrop-blur-sm border border-slate-200/80 shadow-sm rounded-xl p-4",

@@ -92,6 +92,7 @@ const Logo = memo(function Logo({ dark = false }: { dark?: boolean }) {
         width={40}
         height={40}
         priority
+        sizes="(max-width: 640px) 32px, 40px"
         className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl shadow-lg transition-all duration-300 group-hover:scale-110 group-hover:shadow-blue-500/30"
       />
       <span className={cn(
@@ -249,12 +250,12 @@ const Navigation = memo(function Navigation({
               Testimoni
             </a>
             <div className="flex items-center gap-3">
-              <Link href="/login">
+              <Link href="/login" prefetch={false}>
                 <GlassButton variant="outline" size="sm">
                   Masuk
                 </GlassButton>
               </Link>
-              <Link href="/login">
+              <Link href="/login" prefetch={false}>
                 <GlassButton size="sm">
                   Masuk Sekarang
                 </GlassButton>
@@ -315,12 +316,12 @@ const MobileMenu = memo(function MobileMenu({
           Testimoni
         </a>
         <div className="flex flex-col gap-3 pt-4 border-t border-slate-200">
-          <Link href="/login" onClick={handleClose}>
+          <Link href="/login" prefetch={false} onClick={handleClose}>
             <GlassButton variant="outline" className="w-full justify-center">
               Masuk
             </GlassButton>
           </Link>
-          <Link href="/login" onClick={handleClose}>
+          <Link href="/login" prefetch={false} onClick={handleClose}>
             <GlassButton className="w-full justify-center">
               Masuk Sekarang
             </GlassButton>
@@ -370,13 +371,13 @@ const HeroSection = memo(function HeroSection() {
             "flex flex-col sm:flex-row items-center justify-center gap-4",
             "animate-in fade-in slide-in-from-bottom-16 duration-700"
           )} style={{ animationDelay: '200ms' }}>
-            <Link href="/login" className="w-full sm:w-auto">
+            <Link href="/login" prefetch={false} className="w-full sm:w-auto">
               <GlassButton size="lg" className="w-full sm:w-auto group">
                 Masuk Sekarang
                 <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
               </GlassButton>
             </Link>
-            <Link href="/login" className="w-full sm:w-auto">
+            <Link href="/login" prefetch={false} className="w-full sm:w-auto">
               <GlassButton variant="outline" size="lg" className="w-full sm:w-auto">
                 Login Demo
               </GlassButton>
@@ -390,7 +391,7 @@ const HeroSection = memo(function HeroSection() {
 
 const FeaturesSection = memo(function FeaturesSection() {
   return (
-    <section id="features" className="py-16 sm:py-20 lg:py-32 relative bg-white/40">
+    <section id="features" className="perf-scroll-section py-16 sm:py-20 lg:py-32 relative bg-white/40">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12 sm:mb-16 lg:mb-20">
           <SectionBadge>Fitur Unggulan</SectionBadge>
@@ -421,7 +422,7 @@ const FeaturesSection = memo(function FeaturesSection() {
 
 const TestimonialsSection = memo(function TestimonialsSection() {
   return (
-    <section id="testimonials" className="py-16 sm:py-20 lg:py-32 relative bg-blue-50/40">
+    <section id="testimonials" className="perf-scroll-section py-16 sm:py-20 lg:py-32 relative bg-blue-50/40">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12 sm:mb-16 lg:mb-20">
           <SectionBadge>Testimoni</SectionBadge>
@@ -449,7 +450,7 @@ const TestimonialsSection = memo(function TestimonialsSection() {
 
 const CTASection = memo(function CTASection() {
   return (
-    <section className="py-16 sm:py-20 lg:py-32 relative overflow-hidden">
+    <section className="perf-scroll-section py-16 sm:py-20 lg:py-32 relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-r from-blue-50 to-white" aria-hidden="true" />
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="max-w-4xl mx-auto text-center">
@@ -460,13 +461,13 @@ const CTASection = memo(function CTASection() {
             Bergabunglah dengan ribuan sekolah yang sudah menggunakan Aegix SLE
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/login" className="w-full sm:w-auto">
+            <Link href="/login" prefetch={false} className="w-full sm:w-auto">
               <GlassButton size="lg" className="w-full sm:w-auto group">
                 Masuk ke Sistem
                 <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
               </GlassButton>
             </Link>
-            <Link href="/login" className="w-full sm:w-auto">
+            <Link href="/login" prefetch={false} className="w-full sm:w-auto">
               <GlassButton variant="outline" size="lg" className="w-full sm:w-auto">
                 Coba Demo
               </GlassButton>

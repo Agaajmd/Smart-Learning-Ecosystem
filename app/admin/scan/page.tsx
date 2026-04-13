@@ -25,8 +25,26 @@ import {
   ChevronDown,
 } from "lucide-react"
 
+type ReportStatus = "pending" | "in_progress" | "resolved"
+
+interface AssetReport {
+  id: string
+  assetId: string
+  assetName: string
+  damageType: string
+  description: string
+  status: ReportStatus
+  createdAt: string
+  location: string
+  reportedBy: string
+  reporterClass: string
+  assignedTo?: string
+  resolvedAt?: string
+  resolution?: string
+}
+
 // Mock data for reports from students
-const mockReports = [
+const mockReports: AssetReport[] = [
   {
     id: "RPT001",
     assetId: "MEJA-A101-001",
@@ -96,7 +114,7 @@ const mockReports = [
 export default function AdminReportsPage() {
   const admin = mockAdmins[0]
   const [reports, setReports] = useState(mockReports)
-  const [selectedReport, setSelectedReport] = useState<typeof mockReports[0] | null>(null)
+  const [selectedReport, setSelectedReport] = useState<AssetReport | null>(null)
   const [filterStatus, setFilterStatus] = useState<"all" | "pending" | "in_progress" | "resolved">("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [showActionModal, setShowActionModal] = useState(false)

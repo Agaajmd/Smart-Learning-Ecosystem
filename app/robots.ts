@@ -10,13 +10,12 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: '*',
-        allow: [
-          '/',
-        ],
+        allow: ['/', '/canteen'],
         disallow: [
           '/api/',
           '/_next/',
           '/login',
+          '/register',
           '/admin/*',
           '/employee/*',
           '/student/*',
@@ -24,12 +23,13 @@ export default function robots(): MetadataRoute.Robots {
           '/canteen/*',
           '/canteen-owner/*',
           '/super-admin/*',
+          '/*?*',
         ],
       },
       {
         userAgent: 'Googlebot',
-        allow: ['/'],
-        disallow: ['/api/', '/_next/', '/login', '/*?*'],
+        allow: ['/', '/canteen'],
+        disallow: ['/api/', '/_next/', '/login', '/register', '/*?*'],
       },
     ],
     sitemap: `${baseUrl}/sitemap.xml`,

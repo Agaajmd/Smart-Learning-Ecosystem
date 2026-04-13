@@ -79,7 +79,7 @@ export default function StudentProfile() {
 
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-600 border border-blue-200 mt-3">
               <GraduationCap className="w-4 h-4" />
-              <span className="text-sm font-medium">{student.class}</span>
+              <span className="text-sm font-medium">{(student.classId ?? "-").toUpperCase()}</span>
             </div>
           </div>
         </GlassCard>
@@ -88,7 +88,7 @@ export default function StudentProfile() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <GlassCard className="text-center py-3">
             <Award className="w-5 h-5 mx-auto mb-1 text-amber-500" />
-            <p className="text-lg font-bold text-slate-800">{student.score}</p>
+            <p className="text-lg font-bold text-slate-800">{student.coins}</p>
             <p className="text-xs text-slate-500">Poin</p>
           </GlassCard>
           <GlassCard className="text-center py-3">
@@ -120,7 +120,7 @@ export default function StudentProfile() {
               <GraduationCap className="w-5 h-5 text-slate-400" />
               <div>
                 <p className="text-xs text-slate-400">Kelas</p>
-                <p className="font-medium text-slate-800">{student.class}</p>
+                <p className="font-medium text-slate-800">{(student.classId ?? "-").toUpperCase()}</p>
               </div>
             </div>
 

@@ -245,6 +245,7 @@ export const BottomNavigation = ({ role, userName, userAvatar }: BottomNavigatio
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={false}
                   onClick={() => setIsOpen(false)}
                   className={cn(
                     "flex flex-col items-center gap-2 p-3 rounded-2xl transition-all duration-200 active:scale-[0.95]",
@@ -293,6 +294,7 @@ export const BottomNavigation = ({ role, userName, userAvatar }: BottomNavigatio
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={false}
                   className={cn(
                     "flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-all duration-300",
                     isActive
