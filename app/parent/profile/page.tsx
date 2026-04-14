@@ -17,6 +17,7 @@ import {
   Camera,
 } from "lucide-react"
 import Link from "next/link"
+import { RouteLoading } from "@/components/templates/route-loading"
 
 export default function ParentProfilePage() {
   const [parent, setParent] = useState<any>(null)
@@ -122,11 +123,7 @@ export default function ParentProfilePage() {
   }
 
   if (!parent) {
-    return (
-      <DashboardLayout role="PARENT" userName="Parent" userAvatar="/placeholder-user.jpg">
-        <div className="max-w-2xl mx-auto py-8 text-slate-500">Profil parent belum tersedia.</div>
-      </DashboardLayout>
-    )
+    return <RouteLoading />
   }
 
   return (

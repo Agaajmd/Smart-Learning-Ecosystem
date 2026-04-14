@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
+import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassCard } from "@/components/molecules/glass-card"
 import { GlassModal } from "@/components/molecules/glass-modal"
+import { EmptySkeleton } from "@/components/molecules/empty-skeleton"
 import { 
   ArrowLeft,
   Plus,
@@ -33,7 +35,7 @@ type Product = {
 }
 
 export default function CanteenOwnerProductsPage() {
-  const [owner, setOwner] = useState<Owner>({ id: "", name: "Owner", avatar: "/placeholder-user.jpg", canteenId: "" })
+  const [owner, setOwner] = useState<Owner | null>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [filterCategory, setFilterCategory] = useState<string>("all")
@@ -185,6 +187,10 @@ export default function CanteenOwnerProductsPage() {
     }
   }
 
+  if (!owner) {
+    return <RouteLoading />
+  }
+
   return (
     <DashboardLayout role="CANTEEN_OWNER" userName={owner.name} userAvatar={owner.avatar}>
       <div className="max-w-4xl mx-auto space-y-6 px-1">
@@ -303,9 +309,8 @@ export default function CanteenOwnerProductsPage() {
         </div>
 
         {filteredProducts.length === 0 && (
-          <GlassCard className="p-8 text-center">
-            <Package className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-500">Tidak ada produk ditemukan</p>
+          <GlassCard>
+            <EmptySkeleton rows={3} className="py-4" />
           </GlassCard>
         )}
 

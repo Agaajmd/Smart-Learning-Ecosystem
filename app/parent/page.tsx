@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+import { RouteLoading } from "@/components/templates/route-loading"
 
 export default function ParentDashboard() {
   const [parent, setParent] = useState<any>(null)
@@ -66,11 +67,7 @@ export default function ParentDashboard() {
   }, [selectedChild?.id])
 
   if (!parent || !selectedChild) {
-    return (
-      <DashboardLayout role="PARENT" userName="Parent" userAvatar="/placeholder-user.jpg">
-        <div className="max-w-4xl mx-auto py-8 text-slate-500">Data parent belum tersedia.</div>
-      </DashboardLayout>
-    )
+    return <RouteLoading />
   }
 
   // Calculate statistics

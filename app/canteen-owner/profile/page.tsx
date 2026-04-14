@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
+import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassCard } from "@/components/molecules/glass-card"
 import { GlassModal } from "@/components/molecules/glass-modal"
 import { GlassButton } from "@/components/atoms/glass-button"
@@ -24,7 +25,7 @@ type Owner = { id: string; name: string; email: string; phone: string; avatar: s
 type Canteen = { id: string; name: string; description: string; image: string; rating: number; totalOrders: number }
 
 export default function CanteenOwnerProfilePage() {
-  const [owner, setOwner] = useState<Owner>({ id: "", name: "Owner", email: "-", phone: "-", avatar: "/placeholder-user.jpg", isActive: true })
+  const [owner, setOwner] = useState<Owner | null>(null)
   const [canteen, setCanteen] = useState<Canteen | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showAvatarModal, setShowAvatarModal] = useState(false)
@@ -88,6 +89,10 @@ export default function CanteenOwnerProfilePage() {
     } finally {
       setIsSavingProfile(false)
     }
+  }
+
+  if (!owner) {
+    return <RouteLoading />
   }
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {

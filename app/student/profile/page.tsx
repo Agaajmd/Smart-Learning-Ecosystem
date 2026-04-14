@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
 import { GlassCard } from "@/components/molecules/glass-card"
+import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassModal } from "@/components/molecules/glass-modal"
 import { GlassButton } from "@/components/atoms/glass-button"
 import { GlassInput } from "@/components/atoms/glass-input"
@@ -121,11 +122,7 @@ export default function StudentProfile() {
   }
 
   if (!student) {
-    return (
-      <DashboardLayout role="STUDENT" userName="Student" userAvatar="/placeholder-user.jpg">
-        <div className="max-w-2xl mx-auto py-8 text-slate-500">Profil siswa belum tersedia.</div>
-      </DashboardLayout>
-    )
+    return <RouteLoading />
   }
 
   return (

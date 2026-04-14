@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { getSessionUser } from "@/lib/server/session-user"
-import { getDbOrders, setDbOrders } from "@/lib/server/mock-db"
+import { getDbOrders, setDbOrders } from "@/lib/server/data-store"
 
 type CheckoutItem = {
   productId: string

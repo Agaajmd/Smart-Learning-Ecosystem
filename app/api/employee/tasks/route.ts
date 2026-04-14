@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import type { Task } from "@/lib/data-model"
-import { getDbTasks, getDbTaskSubmissions, setDbTasks, setDbTaskSubmissions } from "@/lib/server/mock-db"
+import { getDbTasks, getDbTaskSubmissions, setDbTasks, setDbTaskSubmissions } from "@/lib/server/data-store"
 import { logAudit } from "@/lib/server/audit-log"
 
 export async function GET(request: Request) {

@@ -9,7 +9,7 @@ import {
   getDbTeachers,
   setDbAdmins,
   setDbTeachers,
-} from "@/lib/server/mock-db"
+} from "@/lib/server/data-store"
 import { logAudit } from "@/lib/server/audit-log"
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {

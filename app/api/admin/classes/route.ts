@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getDbAdmins, getDbClasses, getDbStudents, setDbClasses } from "@/lib/server/mock-db"
+import { getDbAdmins, getDbClasses, getDbStudents, setDbClasses } from "@/lib/server/data-store"
 import { logAudit } from "@/lib/server/audit-log"
 
 export async function GET() {

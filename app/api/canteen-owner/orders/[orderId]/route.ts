@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { type OrderStatus } from "@/lib/data-model"
-import { getDbOrders, setDbOrders } from "@/lib/server/mock-db"
+import { getDbOrders, setDbOrders } from "@/lib/server/data-store"
 import { logAudit } from "@/lib/server/audit-log"
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ orderId: string }> }) {

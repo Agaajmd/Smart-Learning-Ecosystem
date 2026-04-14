@@ -15,11 +15,12 @@ import {
   getDbPayments,
   getDbProducts,
   getDbSchedules,
+  getDbStudentReports,
   getDbStudents,
   getDbSuperAdmins,
   getDbTasks,
   getDbTeachers,
-} from "@/lib/server/mock-db"
+} from "@/lib/server/data-store"
 
 export async function GET(request: Request, { params }: { params: Promise<{ role: string }> }) {
   const { role } = await params
@@ -76,19 +77,27 @@ export async function GET(request: Request, { params }: { params: Promise<{ role
         (sessionUser?.role === "ADMIN" ? users.find((user) => user.id === sessionUser.id && user.isActive) : null) ||
         users.find((user) => user.role === "ADMIN" && user.isActive) ||
         null
-      const reports = [
-        { id: "r1", type: "damage", title: "AC Rusak di Kelas 10-A", status: "pending", date: "2025-12-20", reporter: "Pak Ahmad", priority: "high" },
-        { id: "r2", type: "facility", title: "Proyektor Mati di Lab", status: "in-progress", date: "2025-12-19", reporter: "Bu Sri", priority: "medium" },
-        { id: "r3", type: "damage", title: "Kursi Patah Ruang 102", status: "resolved", date: "2025-12-18", reporter: "Pak Budi", priority: "low" },
-        { id: "r4", type: "facility", title: "Kebocoran Atap Aula", status: "pending", date: "2025-12-17", reporter: "Bu Maria", priority: "high" },
-        { id: "r5", type: "damage", title: "Papan Tulis Retak", status: "pending", date: "2025-12-16", reporter: "Pak Joko", priority: "medium" },
-      ]
-      const inventory = [
-        { id: "i1", name: "Proyektor", total: 25, working: 22, broken: 3 },
-        { id: "i2", name: "AC", total: 40, working: 38, broken: 2 },
-        { id: "i3", name: "Komputer Lab", total: 60, working: 55, broken: 5 },
-        { id: "i4", name: "Meja Siswa", total: 500, working: 485, broken: 15 },
-      ]
+      const reports = getDbStudentReports().map((report) => ({
+        id: report.id,
+        type: report.damageType,
+        title: report.assetName,
+        status: report.status.replace("_", "-"),
+        date: report.createdAt,
+        reporter: report.studentId,
+        priority: report.status === "pending" ? "high" : report.status === "in_progress" ? "medium" : "low",
+      }))
+      const inventory = getDbCanteens().map((canteen) => {
+        const products = getDbProducts().filter((product) => product.canteenId === canteen.id)
+        const working = products.filter((product) => product.isAvailable).length
+        const broken = Math.max(products.length - working, 0)
+        return {
+          id: canteen.id,
+          name: canteen.name,
+          total: products.length,
+          working,
+          broken,
+        }
+      })
       return NextResponse.json({ admin: adminUser || getDbAdmins()[0] || null, reports, inventory })
     }
 

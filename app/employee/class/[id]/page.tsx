@@ -1,10 +1,5 @@
 import EmployeeClassClient from "./client-page"
 
-// Required for static export with dynamic routes
-export function generateStaticParams() {
-  return [{ id: "c1" }, { id: "c2" }, { id: "c3" }]
-}
-
 interface PageProps {
   params: Promise<{ id: string }>
 }

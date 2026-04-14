@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
+import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassCard } from "@/components/molecules/glass-card"
+import { EmptySkeleton } from "@/components/molecules/empty-skeleton"
 import { 
   Package,
   ShoppingBag,
@@ -37,7 +39,7 @@ type Order = {
 }
 
 export default function CanteenOwnerDashboard() {
-  const [owner, setOwner] = useState<Owner>({ id: "", name: "Owner", avatar: "/placeholder-user.jpg", canteenId: "" })
+  const [owner, setOwner] = useState<Owner | null>(null)
   const [canteen, setCanteen] = useState<Canteen | null>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [orders, setOrders] = useState<Order[]>([])
@@ -104,6 +106,10 @@ export default function CanteenOwnerDashboard() {
       case "CANCELLED": return "Dibatalkan"
       default: return status
     }
+  }
+
+  if (!owner) {
+    return <RouteLoading />
   }
 
   return (
@@ -314,9 +320,8 @@ export default function CanteenOwnerDashboard() {
             ))}
 
             {pendingOrders.length === 0 && preparingOrders.length === 0 && readyOrders.length === 0 && (
-              <GlassCard className="p-8 text-center">
-                <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                <p className="text-slate-500">Tidak ada order aktif saat ini</p>
+              <GlassCard>
+                <EmptySkeleton rows={3} className="py-4" />
               </GlassCard>
             )}
           </div>

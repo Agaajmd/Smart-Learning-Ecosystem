@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { GlassCard } from "@/components/molecules/glass-card"
+import { EmptySkeleton } from "@/components/molecules/empty-skeleton"
 import { GlassButton } from "@/components/atoms/glass-button"
 import { GlassModal } from "@/components/molecules/glass-modal"
 import { CalendarDays, Plus, Edit, Trash2, Users, Save } from "lucide-react"
@@ -108,7 +109,7 @@ export default function TeacherPiketPage() {
       <GlassCard>
         <h2 className="text-lg font-semibold text-slate-800 mb-4">Jadwal Piket - {DAY_LABELS[selectedDay]}</h2>
         {schedulesForDay.length === 0 ? (
-          <div className="text-center py-8 text-slate-400"><CalendarDays className="w-12 h-12 mx-auto mb-3 opacity-50" /><p>Belum ada jadwal piket untuk hari ini</p></div>
+          <EmptySkeleton rows={3} className="py-4" />
         ) : (
           <div className="space-y-3">
             {schedulesForDay.map((schedule) => (

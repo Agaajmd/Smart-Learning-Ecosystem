@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
+import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassCard } from "@/components/molecules/glass-card"
 import {
   TrendingUp,
@@ -32,7 +33,7 @@ import {
 } from "recharts"
 
 export default function SuperAdminFinance() {
-  const [superAdmin, setSuperAdmin] = useState({ name: "Kepala Sekolah", avatar: "/placeholder-user.jpg" })
+  const [superAdmin, setSuperAdmin] = useState<{ name: string; avatar: string } | null>(null)
   const [financialData, setFinancialData] = useState<Array<{ month: string; income: number; expenses: number }>>([])
   const [students, setStudents] = useState<Array<{ paymentStatus?: string }>>([])
   const [expenseBreakdown, setExpenseBreakdown] = useState<Array<{ category: string; amount: number; percentage: number }>>([])
@@ -42,7 +43,7 @@ export default function SuperAdminFinance() {
     let active = true
     const load = async () => {
       try {
-        const res = await fetch("/api/dashboard/super-admin", { cache: "no-store" })
+        const res = await fetch("/api/super-admin/overview", { cache: "no-store" })
         if (!res.ok) return
         const data = await res.json()
         if (!active) return
@@ -75,6 +76,10 @@ export default function SuperAdminFinance() {
   ]
 
   const formatCurrency = (value: number) => `Rp ${(value / 1000000).toFixed(0)}M`
+
+  if (!superAdmin) {
+    return <RouteLoading />
+  }
 
   return (
     <DashboardLayout role="SUPER_ADMIN" userName={superAdmin.name} userAvatar={superAdmin.avatar}>

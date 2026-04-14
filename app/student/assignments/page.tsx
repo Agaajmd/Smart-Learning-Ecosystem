@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
+import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassCard } from "@/components/molecules/glass-card"
 import { GlassModal } from "@/components/molecules/glass-modal"
+import { EmptySkeleton } from "@/components/molecules/empty-skeleton"
 import { GlassButton } from "@/components/atoms/glass-button"
 import type { Task, TaskSubmission } from "@/lib/data-model"
 import {
@@ -198,8 +200,12 @@ export default function StudentAssignmentsPage() {
     { id: "graded" as TabType, label: "Dinilai", count: gradedTasks.length, icon: CheckCircle2 },
   ]
 
+  if (!student) {
+    return <RouteLoading />
+  }
+
   return (
-    <DashboardLayout role="STUDENT" userName={student?.name || "Student"} userAvatar={student?.avatar || "/placeholder-user.jpg"}>
+    <DashboardLayout role="STUDENT" userName={student.name} userAvatar={student.avatar || "/placeholder-user.jpg"}>
       <div className="max-w-2xl mx-auto space-y-5 px-1">
         <div className="pb-2">
           <h1 className="text-xl font-bold text-slate-800">Tugas Saya</h1>
@@ -234,9 +240,8 @@ export default function StudentAssignmentsPage() {
 
         <div className="space-y-3">
           {getTaskList().length === 0 ? (
-            <GlassCard className="text-center py-8">
-              <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500">Tidak ada tugas</p>
+            <GlassCard>
+              <EmptySkeleton rows={3} className="py-4" />
             </GlassCard>
           ) : (
             getTaskList().map((task) => {

@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
+import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassCard } from "@/components/molecules/glass-card"
+import { EmptySkeleton } from "@/components/molecules/empty-skeleton"
 import type { Employee, Parent, StudentGrade, Student } from "@/lib/data-model"
 import { 
   ArrowLeft,
@@ -69,8 +71,12 @@ export default function ParentGradesPage() {
     }
   }
 
+  if (!parent) {
+    return <RouteLoading />
+  }
+
   return (
-    <DashboardLayout role="PARENT" userName={parent?.name || "Parent"} userAvatar={parent?.avatar || "/placeholder-user.jpg"}>
+    <DashboardLayout role="PARENT" userName={parent.name} userAvatar={parent.avatar || "/placeholder-user.jpg"}>
       <div className="max-w-4xl mx-auto space-y-6 px-1">
         {/* Header */}
         <div className="flex items-center gap-3">
@@ -181,10 +187,7 @@ export default function ParentGradesPage() {
               </table>
             </div>
           ) : (
-            <div className="text-center py-8">
-              <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500">Belum ada data nilai</p>
-            </div>
+            <EmptySkeleton rows={4} className="py-4" />
           )}
         </GlassCard>
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
+import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassCard } from "@/components/molecules/glass-card"
 import type { ActivityPoint, Parent, Student } from "@/lib/data-model"
 import { 
@@ -54,8 +55,12 @@ export default function ParentPointsPage() {
 
   const categories = [...new Set(activityPoints.map(p => p.category))]
 
+  if (!parent) {
+    return <RouteLoading />
+  }
+
   return (
-    <DashboardLayout role="PARENT" userName={parent?.name || "Parent"} userAvatar={parent?.avatar || "/placeholder-user.jpg"}>
+    <DashboardLayout role="PARENT" userName={parent.name} userAvatar={parent.avatar || "/placeholder-user.jpg"}>
       <div className="max-w-4xl mx-auto space-y-6 px-1">
         {/* Header */}
         <div className="flex items-center gap-3">

@@ -3,22 +3,37 @@ import type { Schedule } from "@/lib/data-model"
 import {
   getDbAdmins,
   getDbClasses,
-  getDbPiketSchedules,
   getDbSchedules,
-  getDbStudents,
   getDbTeachers,
   setDbSchedules,
 } from "@/lib/server/data-store"
+import { getAllDbUsers } from "@/lib/server/google-sheets-auth"
+import { getSessionUser } from "@/lib/server/session-user"
 import { logAudit } from "@/lib/server/audit-log"
 
+async function resolveActorId() {
+  const sessionUser = await getSessionUser()
+  if (sessionUser?.id) return sessionUser.id
+  const users = await getAllDbUsers()
+  return users.find((user) => user.role === "SUPER_ADMIN" && user.isActive)?.id || getDbAdmins()[0]?.id || "system"
+}
+
 export async function GET() {
+  const users = await getAllDbUsers()
+  const sessionUser = await getSessionUser()
+  const superAdmin =
+    (sessionUser?.role === "SUPER_ADMIN"
+      ? users.find((user) => user.id === sessionUser.id && user.role === "SUPER_ADMIN" && user.isActive) || null
+      : null) ||
+    users.find((user) => user.role === "SUPER_ADMIN" && user.isActive) ||
+    null
+
   return NextResponse.json({
-    admin: getDbAdmins()[0] || null,
+    superAdmin,
     schedules: getDbSchedules(),
     classes: getDbClasses(),
     teachers: getDbTeachers(),
-    students: getDbStudents(),
-    piketSchedules: getDbPiketSchedules(),
+    admins: getDbAdmins(),
   })
 }
 
@@ -43,7 +58,7 @@ export async function POST(request: Request) {
 
   setDbSchedules([...schedules, schedule])
   logAudit({
-    actorId: getDbAdmins()[0]?.id || "admin",
+    actorId: await resolveActorId(),
     action: "CREATE",
     entityName: "schedules",
     entityId: schedule.id,
@@ -73,7 +88,7 @@ export async function PATCH(request: Request) {
 
   setDbSchedules(schedules.map((item) => (item.id === existing.id ? updated : item)))
   logAudit({
-    actorId: getDbAdmins()[0]?.id || "admin",
+    actorId: await resolveActorId(),
     action: "UPDATE",
     entityName: "schedules",
     entityId: updated.id,
@@ -99,7 +114,7 @@ export async function DELETE(request: Request) {
 
   setDbSchedules(schedules.filter((item) => item.id !== id))
   logAudit({
-    actorId: getDbAdmins()[0]?.id || "admin",
+    actorId: await resolveActorId(),
     action: "DELETE",
     entityName: "schedules",
     entityId: existing.id,

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
+import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassCard } from "@/components/molecules/glass-card"
 import { GlassModal } from "@/components/molecules/glass-modal"
 import { GlassButton } from "@/components/atoms/glass-button"
@@ -26,7 +27,7 @@ import {
 } from "lucide-react"
 
 export default function SuperAdminProfile() {
-  const [superAdmin, setSuperAdmin] = useState({ id: "", name: "Kepala Sekolah", email: "superadmin@school.com", avatar: "/placeholder-user.jpg" })
+  const [superAdmin, setSuperAdmin] = useState<{ id: string; name: string; email: string; avatar: string } | null>(null)
   const [studentsCount, setStudentsCount] = useState(0)
   const [employeesCount, setEmployeesCount] = useState(0)
   const [classesCount, setClassesCount] = useState(0)
@@ -35,11 +36,7 @@ export default function SuperAdminProfile() {
   const [showAvatarModal, setShowAvatarModal] = useState(false)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [isSavingAvatar, setIsSavingAvatar] = useState(false)
-  const [editForm, setEditForm] = useState({
-    name: superAdmin.name,
-    email: superAdmin.email,
-    phone: "081234567890",
-  })
+  const [editForm, setEditForm] = useState({ name: "", email: "", phone: "081234567890" })
 
   useEffect(() => {
     let active = true
@@ -74,13 +71,16 @@ export default function SuperAdminProfile() {
     }
   }, [])
 
-  // Mock achievements in Indonesian
   const achievements = [
-    { title: "10 Tahun Mengabdi", icon: Award, earned: true },
-    { title: "Pengelolaan Anggaran", icon: DollarSign, earned: true },
-    { title: "Pemimpin Pertumbuhan", icon: TrendingUp, earned: true },
-    { title: "Pembangun Komunitas", icon: GraduationCap, earned: false },
+    { title: "10 Tahun Mengabdi", icon: Award, earned: classesCount > 0 },
+    { title: "Pengelolaan Anggaran", icon: DollarSign, earned: profit > 0 },
+    { title: "Pemimpin Pertumbuhan", icon: TrendingUp, earned: studentsCount > 0 && employeesCount > 0 },
+    { title: "Pembangun Komunitas", icon: GraduationCap, earned: studentsCount >= 100 },
   ]
+
+  if (!superAdmin) {
+    return <RouteLoading />
+  }
 
   const handleSaveProfile = async () => {
     if (!superAdmin.id || isSavingProfile) return

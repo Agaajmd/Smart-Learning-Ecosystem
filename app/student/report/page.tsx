@@ -4,7 +4,9 @@ import type React from "react"
 
 import { useEffect, useRef, useState } from "react"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
+import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassCard } from "@/components/molecules/glass-card"
+import { EmptySkeleton } from "@/components/molecules/empty-skeleton"
 import { GlassModal } from "@/components/molecules/glass-modal"
 import { GlassInput } from "@/components/atoms/glass-input"
 import { GlassTextarea } from "@/components/atoms/glass-textarea"
@@ -169,8 +171,12 @@ export default function StudentReportPage() {
     })
   }
 
+  if (!student) {
+    return <RouteLoading />
+  }
+
   return (
-    <DashboardLayout role="STUDENT" userName={student?.name || "Student"} userAvatar={student?.avatar || "/placeholder-user.jpg"}>
+    <DashboardLayout role="STUDENT" userName={student.name} userAvatar={student.avatar || "/placeholder-user.jpg"}>
       <div className="max-w-md mx-auto space-y-6">
         {/* Header */}
         <div className="text-center">
@@ -307,9 +313,8 @@ export default function StudentReportPage() {
         {activeTab === "history" && (
           <div className="space-y-3">
             {reports.length === 0 ? (
-              <GlassCard className="text-center py-8">
-                <Package className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                <p className="text-slate-500">Belum ada laporan</p>
+              <GlassCard>
+                <EmptySkeleton rows={3} className="py-4" />
               </GlassCard>
             ) : (
               reports.map((report) => (

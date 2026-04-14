@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { Loader2, Plus, Search, Store, Trash2, UserCog, UtensilsCrossed } from "lucide-react"
 import { toast } from "sonner"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
+import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassCard } from "@/components/molecules/glass-card"
 import { GlassInput } from "@/components/atoms/glass-input"
 import { GlassButton } from "@/components/atoms/glass-button"
@@ -143,8 +144,12 @@ export default function AdminCanteenPage() {
     }
   }
 
+  if (!admin) {
+    return <RouteLoading />
+  }
+
   return (
-    <DashboardLayout role="ADMIN" userName={admin?.name || "Admin"} userAvatar={admin?.avatar || "/placeholder-user.jpg"}>
+    <DashboardLayout role="ADMIN" userName={admin.name} userAvatar={admin.avatar || "/placeholder-user.jpg"}>
       <div className="max-w-5xl mx-auto space-y-6 px-1">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>

@@ -9,6 +9,7 @@ import { GlassInput } from "@/components/atoms/glass-input"
 import { GlassButton } from "@/components/atoms/glass-button"
 import { GlassModal } from "@/components/molecules/glass-modal"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
+import { RouteLoading } from "@/components/templates/route-loading"
 import type { Employee, Schedule, User } from "@/lib/data-model"
 import {
   Search,
@@ -72,7 +73,7 @@ export default function SuperAdminStaff() {
 
   const loadStaff = useCallback(async () => {
     try {
-      const res = await fetch("/api/staff", { cache: "no-store" })
+      const res = await fetch("/api/super-admin/staff", { cache: "no-store" })
       if (!res.ok) throw new Error("Gagal mengambil data staff")
       const data = await res.json()
       setSuperAdmin(data.superAdmin || null)
@@ -80,7 +81,7 @@ export default function SuperAdminStaff() {
       setAdmins(Array.isArray(data.admins) ? data.admins : [])
       setSchedules(Array.isArray(data.schedules) ? data.schedules : [])
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Gagal memuat data staff"
+      const message = error instanceof Error ? error.message : "Gagal mengambil data staff"
       toast.error(message)
     } finally {
       setIsLoading(false)
@@ -144,7 +145,7 @@ export default function SuperAdminStaff() {
 
     setIsMutating(true)
     try {
-      const res = await fetch("/api/staff", {
+      const res = await fetch("/api/super-admin/staff", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newStaff),
@@ -183,7 +184,7 @@ export default function SuperAdminStaff() {
 
     setIsMutating(true)
     try {
-      const res = await fetch(`/api/staff/${editStaff.id}`, {
+      const res = await fetch(`/api/super-admin/staff/${editStaff.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editStaff),
@@ -220,7 +221,7 @@ export default function SuperAdminStaff() {
     if (!staffToDelete) return
     setIsMutating(true)
     try {
-      const res = await fetch(`/api/staff/${staffToDelete.id}`, { method: "DELETE" })
+      const res = await fetch(`/api/super-admin/staff/${staffToDelete.id}`, { method: "DELETE" })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || "Gagal menghapus staff")
 
@@ -250,20 +251,18 @@ export default function SuperAdminStaff() {
   }, [])
 
   if (isLoading) {
-    return (
-      <DashboardLayout role="SUPER_ADMIN" userName="Kepala Sekolah" userAvatar="/placeholder-user.jpg">
-        <div className="w-full max-w-4xl mx-auto">
-          <GlassCard className="p-6 text-center text-slate-500">Memuat data staff...</GlassCard>
-        </div>
-      </DashboardLayout>
-    )
+    return <RouteLoading />
+  }
+
+  if (!superAdmin) {
+    return <RouteLoading />
   }
 
   return (
     <DashboardLayout
       role="SUPER_ADMIN"
-      userName={superAdmin?.name || "Kepala Sekolah"}
-      userAvatar={superAdmin?.avatar || "/placeholder-user.jpg"}
+      userName={superAdmin.name}
+      userAvatar={superAdmin.avatar || "/placeholder-user.jpg"}
     >
       <div className="w-full max-w-4xl mx-auto space-y-4 sm:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { getAllDbUsers } from "@/lib/server/google-sheets-auth"
 import { getSessionUser } from "@/lib/server/session-user"
-import { getDbTaskSubmissions, getDbTasks, setDbTaskSubmissions } from "@/lib/server/mock-db"
+import { getDbTaskSubmissions, getDbTasks, setDbTaskSubmissions } from "@/lib/server/data-store"
 import { logAudit } from "@/lib/server/audit-log"
 
 export async function GET(request: Request) {

@@ -1,39 +1,21 @@
-import {
-  mockAdmins,
-  mockOrders,
-  mockClasses,
-  mockEmployees,
-  mockSuperAdmins,
-  mockSchedule,
-  mockTasks,
-  mockTaskSubmissions,
-  mockPiketSchedule,
-  mockProducts,
-  mockStudents,
-  mockParents,
-  mockCanteenOwners,
-  mockCanteens,
-  mockActivityPoints,
-  mockAttendanceRecords,
-  mockStudentGrades,
-  mockStudentPayments,
-  type ClassRoom,
-  type Employee,
-  type Order,
-  type Product,
-  type Student,
-  type Parent,
-  type Canteen,
-  type CanteenOwner,
-  type Schedule,
-  type Task,
-  type TaskSubmission,
-  type PiketSchedule,
-  type User,
-  type ActivityPoint,
-  type AttendanceRecord,
-  type StudentGrade,
-  type StudentPayment,
+import type {
+  ClassRoom,
+  Employee,
+  Order,
+  Product,
+  Student,
+  Parent,
+  Canteen,
+  CanteenOwner,
+  Schedule,
+  Task,
+  TaskSubmission,
+  PiketSchedule,
+  User,
+  ActivityPoint,
+  AttendanceRecord,
+  StudentGrade,
+  StudentPayment,
 } from "@/lib/data-model"
 
 export interface StudentReport {
@@ -59,28 +41,27 @@ export interface AuditLog {
   createdAt: string
 }
 
-// Module-scoped memory store for API routes during dev/runtime.
 const db = {
-  orders: [...mockOrders] as Order[],
-  products: [...mockProducts] as Product[],
-  activityPoints: [...mockActivityPoints] as ActivityPoint[],
-  attendance: [...mockAttendanceRecords] as AttendanceRecord[],
-  grades: [...mockStudentGrades] as StudentGrade[],
-  payments: [...mockStudentPayments] as StudentPayment[],
+  orders: [] as Order[],
+  products: [] as Product[],
+  activityPoints: [] as ActivityPoint[],
+  attendance: [] as AttendanceRecord[],
+  grades: [] as StudentGrade[],
+  payments: [] as StudentPayment[],
   auditLogs: [] as AuditLog[],
-  teachers: [...mockEmployees] as Employee[],
-  admins: [...mockAdmins] as User[],
-  superAdmins: [...mockSuperAdmins] as User[],
-  schedules: [...mockSchedule] as Schedule[],
-  piketSchedules: [...mockPiketSchedule] as PiketSchedule[],
-  tasks: [...mockTasks] as Task[],
-  taskSubmissions: [...mockTaskSubmissions] as TaskSubmission[],
-  classes: [...mockClasses] as ClassRoom[],
+  teachers: [] as Employee[],
+  admins: [] as User[],
+  superAdmins: [] as User[],
+  schedules: [] as Schedule[],
+  piketSchedules: [] as PiketSchedule[],
+  tasks: [] as Task[],
+  taskSubmissions: [] as TaskSubmission[],
+  classes: [] as ClassRoom[],
   studentReports: [] as StudentReport[],
-  students: [...mockStudents] as Student[],
-  parents: [...mockParents] as Parent[],
-  canteens: [...mockCanteens] as Canteen[],
-  canteenOwners: [...mockCanteenOwners] as CanteenOwner[],
+  students: [] as Student[],
+  parents: [] as Parent[],
+  canteens: [] as Canteen[],
+  canteenOwners: [] as CanteenOwner[],
 }
 
 export const getDbOrders = () => db.orders
@@ -125,22 +106,27 @@ export const getDbSuperAdmins = () => db.superAdmins
 export const setDbSuperAdmins = (superAdmins: User[]) => {
   db.superAdmins = superAdmins
 }
+
 export const getDbSchedules = () => db.schedules
 export const setDbSchedules = (schedules: Schedule[]) => {
   db.schedules = schedules
 }
+
 export const getDbPiketSchedules = () => db.piketSchedules
 export const setDbPiketSchedules = (piketSchedules: PiketSchedule[]) => {
   db.piketSchedules = piketSchedules
 }
+
 export const getDbTasks = () => db.tasks
 export const setDbTasks = (tasks: Task[]) => {
   db.tasks = tasks
 }
+
 export const getDbTaskSubmissions = () => db.taskSubmissions
 export const setDbTaskSubmissions = (taskSubmissions: TaskSubmission[]) => {
   db.taskSubmissions = taskSubmissions
 }
+
 export const getDbClasses = () => db.classes
 export const setDbClasses = (classes: ClassRoom[]) => {
   db.classes = classes

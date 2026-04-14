@@ -1,4 +1,4 @@
-import { getDbAuditLogs, setDbAuditLogs, type AuditLog } from "@/lib/server/mock-db"
+import { getDbAuditLogs, setDbAuditLogs, type AuditLog } from "@/lib/server/data-store"
 
 export type AuditAction = "CREATE" | "UPDATE" | "DELETE" | "LOGIN" | "LOGOUT"
 

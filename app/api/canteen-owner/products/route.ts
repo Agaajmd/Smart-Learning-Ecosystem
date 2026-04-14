@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server"
 import type { Product } from "@/lib/data-model"
 import { getAllDbUsers } from "@/lib/server/google-sheets-auth"
-import { getDbProducts, setDbProducts } from "@/lib/server/mock-db"
+import { getDbProducts, setDbProducts } from "@/lib/server/data-store"
 import { logAudit } from "@/lib/server/audit-log"
-import { getDbCanteenOwners } from "@/lib/server/mock-db"
+import { getDbCanteenOwners } from "@/lib/server/data-store"
 
 export async function GET(request: Request) {
   const url = new URL(request.url)

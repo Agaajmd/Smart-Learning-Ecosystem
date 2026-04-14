@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
+import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassCard } from "@/components/molecules/glass-card"
 import { 
   ArrowLeft,
@@ -17,10 +18,18 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 
 type Owner = { id: string; name: string; avatar: string }
-type Order = { id: string; status: string; createdAt: string; totalAmount: number; customerName: string }
+type OrderItem = { productName: string; quantity: number; price: number }
+type Order = {
+  id: string
+  status: string
+  createdAt: string
+  totalAmount: number
+  customerName: string
+  items?: OrderItem[]
+}
 
 export default function CanteenOwnerFinancePage() {
-  const [owner, setOwner] = useState<Owner>({ id: "", name: "Owner", avatar: "/placeholder-user.jpg" })
+  const [owner, setOwner] = useState<Owner | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
   const [selectedPeriod, setSelectedPeriod] = useState<string>("today")
 
@@ -36,40 +45,71 @@ export default function CanteenOwnerFinancePage() {
   }, [])
 
   const completedOrders = useMemo(() => orders.filter((o) => o.status === "COMPLETED"), [orders])
+  const todayDate = useMemo(() => new Date(), [])
+  const startOfToday = useMemo(() => {
+    const date = new Date(todayDate)
+    date.setHours(0, 0, 0, 0)
+    return date
+  }, [todayDate])
 
-  // Calculate revenues
-  const todayOrders = completedOrders.filter(o => o.createdAt.startsWith("2025-12-30"))
-  const todayRevenue = todayOrders.reduce((acc, o) => acc + o.totalAmount, 0)
-  
-  const weekOrders = completedOrders.filter(o => {
-    const orderDate = new Date(o.createdAt)
-    const weekAgo = new Date("2025-12-23")
-    return orderDate >= weekAgo
-  })
-  const weekRevenue = weekOrders.reduce((acc, o) => acc + o.totalAmount, 0)
+  const todayOrders = useMemo(
+    () => completedOrders.filter((o) => new Date(o.createdAt) >= startOfToday),
+    [completedOrders, startOfToday],
+  )
+  const todayRevenue = useMemo(
+    () => todayOrders.reduce((acc, o) => acc + Number(o.totalAmount || 0), 0),
+    [todayOrders],
+  )
 
-  const monthRevenue = completedOrders.reduce((acc, o) => acc + o.totalAmount, 0)
+  const weekRevenueData = useMemo(() => {
+    const weekAgo = new Date(startOfToday)
+    weekAgo.setDate(weekAgo.getDate() - 6)
+    const weekOrders = completedOrders.filter((o) => new Date(o.createdAt) >= weekAgo)
+    const weekRevenue = weekOrders.reduce((acc, o) => acc + Number(o.totalAmount || 0), 0)
+    return { weekOrders, weekRevenue }
+  }, [completedOrders, startOfToday])
 
-  // Mock daily revenue data
-  const dailyRevenue = [
-    { date: "24 Des", revenue: 150000, orders: 12 },
-    { date: "25 Des", revenue: 180000, orders: 15 },
-    { date: "26 Des", revenue: 120000, orders: 10 },
-    { date: "27 Des", revenue: 200000, orders: 18 },
-    { date: "28 Des", revenue: 175000, orders: 14 },
-    { date: "29 Des", revenue: 220000, orders: 20 },
-    { date: "30 Des", revenue: todayRevenue, orders: todayOrders.length },
-  ]
+  const monthRevenue = useMemo(
+    () => completedOrders.reduce((acc, o) => acc + Number(o.totalAmount || 0), 0),
+    [completedOrders],
+  )
 
-  // Top selling products (mock)
-  const topProducts = [
-    { name: "Nasi Uduk", sold: 45, revenue: 675000 },
-    { name: "Soto Ayam", sold: 38, revenue: 456000 },
-    { name: "Es Teh Manis", sold: 72, revenue: 360000 },
-    { name: "Kue Lumpur", sold: 60, revenue: 180000 },
-  ]
+  const dailyRevenue = useMemo(() => {
+    const result = [] as { date: string; revenue: number; orders: number }[]
+    for (let offset = 6; offset >= 0; offset -= 1) {
+      const day = new Date(startOfToday)
+      day.setDate(day.getDate() - offset)
+      const key = day.toISOString().slice(0, 10)
+      const dayOrders = completedOrders.filter((o) => String(o.createdAt).slice(0, 10) === key)
+      const revenue = dayOrders.reduce((acc, o) => acc + Number(o.totalAmount || 0), 0)
+      result.push({
+        date: day.toLocaleDateString("id-ID", { day: "2-digit", month: "short" }),
+        revenue,
+        orders: dayOrders.length,
+      })
+    }
+    return result
+  }, [completedOrders, startOfToday])
 
-  const maxRevenue = Math.max(...dailyRevenue.map(d => d.revenue))
+  const topProducts = useMemo(() => {
+    const productMap = new Map<string, { name: string; sold: number; revenue: number }>()
+    for (const order of completedOrders) {
+      for (const item of order.items || []) {
+        const key = item.productName
+        const current = productMap.get(key) || { name: key, sold: 0, revenue: 0 }
+        current.sold += Number(item.quantity || 0)
+        current.revenue += Number(item.price || 0) * Number(item.quantity || 0)
+        productMap.set(key, current)
+      }
+    }
+    return [...productMap.values()].sort((a, b) => b.sold - a.sold).slice(0, 5)
+  }, [completedOrders])
+
+  const maxRevenue = Math.max(...dailyRevenue.map((d) => d.revenue), 1)
+
+  if (!owner) {
+    return <RouteLoading />
+  }
 
   const periods = [
     { value: "today", label: "Hari Ini" },
@@ -142,8 +182,8 @@ export default function CanteenOwnerFinancePage() {
                 <TrendingUp className="w-5 h-5" />
                 <span className="text-sm font-medium">Minggu Ini</span>
               </div>
-              <p className="text-2xl font-bold text-slate-800">Rp {weekRevenue.toLocaleString()}</p>
-              <p className="text-sm text-slate-500 mt-1">{weekOrders.length} order selesai</p>
+              <p className="text-2xl font-bold text-slate-800">Rp {weekRevenueData.weekRevenue.toLocaleString()}</p>
+              <p className="text-sm text-slate-500 mt-1">{weekRevenueData.weekOrders.length} order selesai</p>
             </div>
           </GlassCard>
 

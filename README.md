@@ -21,7 +21,7 @@
 - Login/Register dengan validasi
 - Role-based access control (6 roles)
 - Protected routes dengan client-side auth guard
-- Session persistence (localStorage)
+- Session persistence (server session)
 - Demo accounts untuk testing
 
 ### 👥 Role & Dashboard
@@ -173,7 +173,7 @@ aegix-sle/
 │
 ├── lib/
 │   ├── auth.tsx                # Auth context, login/logout, guards
-│   ├── data-model.ts           # Shared types and seed data
+│   ├── data-model.ts           # Shared domain types
 │   └── utils.ts                # Utility functions (cn, etc)
 │
 ├── hooks/
@@ -222,7 +222,7 @@ aegix-sle/
 
 - **Client-side Auth Guard**: Protected routes redirect ke landing jika belum login
 - **Role-based Access**: Setiap role hanya bisa akses halaman yang sesuai
-- **Session Storage**: Data disimpan di localStorage dengan JSON parsing yang aman
+- **Session Storage**: Data sesi dikelola oleh server
 - **No Sensitive Data**: Password tidak disimpan di client
 
 > ⚠️ **Note**: Ini adalah demo app. Untuk production, gunakan:
