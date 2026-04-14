@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
 import { Loader2, Plus, Trash2, UserRoundPlus, Users } from "lucide-react"
 import { toast } from "sonner"
-import { DashboardLayout } from "@/components/templates/dashboard-layout"
+import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassCard } from "@/components/molecules/glass-card"
+import { EmptySkeleton } from "@/components/molecules/empty-skeleton"
 import { GlassButton } from "@/components/atoms/glass-button"
 import { GlassInput } from "@/components/atoms/glass-input"
 import { GlassModal } from "@/components/molecules/glass-modal"
@@ -97,27 +98,32 @@ export default function EmployeeClassDetailClient({ id }: EmployeeClassDetailCli
   const [showFormModal, setShowFormModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
   const load = async () => {
-    const [classesRes, parentsRes] = await Promise.all([
-      fetch("/api/admin/classes", { cache: "no-store" }),
-      fetch(`/api/employee/parents?classId=${classId}`, { cache: "no-store" }),
-    ])
+    try {
+      const [classesRes, parentsRes] = await Promise.all([
+        fetch("/api/admin/classes", { cache: "no-store" }),
+        fetch(`/api/employee/parents?classId=${classId}`, { cache: "no-store" }),
+      ])
 
-    if (!classesRes.ok || !parentsRes.ok) {
-      throw new Error("Gagal memuat data kelas")
+      if (!classesRes.ok || !parentsRes.ok) {
+        throw new Error("Gagal memuat data kelas")
+      }
+
+      const classesData = await classesRes.json()
+      const parentsData = await parentsRes.json()
+
+      const nextClass = (classesData.classes || []).find((item: ClassRoom) => item.id === classId) || null
+      const nextStudents = (classesData.students || []).filter((item: Student) => item.classId === classId)
+
+      setEmployee(classesData.admin || null)
+      setClassItem(nextClass)
+      setStudents(nextStudents)
+      setParents(Array.isArray(parentsData.parents) ? parentsData.parents : [])
+    } finally {
+      setIsLoading(false)
     }
-
-    const classesData = await classesRes.json()
-    const parentsData = await parentsRes.json()
-
-    const nextClass = (classesData.classes || []).find((item: ClassRoom) => item.id === classId) || null
-    const nextStudents = (classesData.students || []).filter((item: Student) => item.classId === classId)
-
-    setEmployee(classesData.admin || null)
-    setClassItem(nextClass)
-    setStudents(nextStudents)
-    setParents(Array.isArray(parentsData.parents) ? parentsData.parents : [])
   }
 
   useEffect(() => {
@@ -169,6 +175,10 @@ export default function EmployeeClassDetailClient({ id }: EmployeeClassDetailCli
       }
     })
   }, [students, classItem])
+
+  if (isLoading) {
+    return <RouteLoading />
+  }
 
   const openCreate = () => {
     setEditingParent(null)
@@ -258,8 +268,7 @@ export default function EmployeeClassDetailClient({ id }: EmployeeClassDetailCli
   }
 
   return (
-    <DashboardLayout role="EMPLOYEE" userName={employee?.name || "Employee"} userAvatar={employee?.avatar || "/placeholder-user.jpg"}>
-      <div className="max-w-6xl mx-auto space-y-6 px-1">
+    <div className="max-w-6xl mx-auto space-y-6 px-1">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-xl font-bold text-slate-800">Detail Kelas {classItem?.name || "-"}</h1>
@@ -298,7 +307,7 @@ export default function EmployeeClassDetailClient({ id }: EmployeeClassDetailCli
               </div>
             </div>
           ))}
-          {parents.length === 0 && <div className="text-center py-8 text-slate-500">Belum ada akun parent untuk kelas ini.</div>}
+          {parents.length === 0 && <EmptySkeleton rows={2} className="py-4" />}
         </GlassCard>
 
         <GlassModal isOpen={showFormModal} onClose={() => setShowFormModal(false)} title={editingParent ? "Edit Akun Parent" : "Tambah Akun Parent"}>
@@ -326,7 +335,6 @@ export default function EmployeeClassDetailClient({ id }: EmployeeClassDetailCli
             </GlassButton>
           </div>
         </GlassModal>
-      </div>
-    </DashboardLayout>
+    </div>
   )
 }

@@ -2,6 +2,8 @@
 
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
 import { GlassCard } from "@/components/molecules/glass-card"
+import { EmptySkeleton } from "@/components/molecules/empty-skeleton"
+import { RouteLoading } from "@/components/templates/route-loading"
 import { Clock, MapPin, User, Calendar as CalendarIcon, ChevronRight } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 
@@ -49,11 +51,7 @@ export default function StudentSchedule() {
   )
 
   if (!student) {
-    return (
-      <DashboardLayout role="STUDENT" userName="Student" userAvatar="/placeholder-user.jpg">
-        <div className="max-w-2xl mx-auto py-8 text-slate-500">Data jadwal belum tersedia.</div>
-      </DashboardLayout>
-    )
+    return <RouteLoading />
   }
 
   return (
@@ -85,9 +83,8 @@ export default function StudentSchedule() {
         {/* Schedule List */}
         <div className="space-y-3">
           {daySchedule.length === 0 ? (
-            <GlassCard className="text-center py-8">
-              <CalendarIcon className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500">Tidak ada jadwal untuk hari ini</p>
+            <GlassCard>
+              <EmptySkeleton rows={3} className="py-4" />
             </GlassCard>
           ) : (
             daySchedule.map((schedule, index) => {

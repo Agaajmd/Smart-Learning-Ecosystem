@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { GlassCard } from "@/components/molecules/glass-card"
+import { RouteLoading } from "@/components/templates/route-loading"
 import { AttendanceLeaderboard } from "@/components/organisms/attendance-leaderboard"
 import { Calendar, LayoutGrid, BookOpen, Users, Award } from "lucide-react"
 import Link from "next/link"
@@ -9,11 +10,14 @@ import type { Student } from "@/lib/data-model"
 
 type Employee = { id: string; name: string; subject: string; classesCount: number; rating: number }
 type Schedule = { id: string; day: string }
+type ClassRoomLite = { id: string }
 
 export default function EmployeeDashboard() {
-  const [employee, setEmployee] = useState<Employee>({ id: "", name: "Employee", subject: "-", classesCount: 0, rating: 0 })
+  const [employee, setEmployee] = useState<Employee>({ id: "", name: "", subject: "-", classesCount: 0, rating: 0 })
+  const [isLoading, setIsLoading] = useState(true)
   const [todayClasses, setTodayClasses] = useState<Schedule[]>([])
   const [students, setStudents] = useState<Student[]>([])
+  const [primaryClassId, setPrimaryClassId] = useState("")
 
   useEffect(() => {
     let active = true
@@ -30,8 +34,14 @@ export default function EmployeeDashboard() {
         if (!contextRes.ok || !active) return
         const context = await contextRes.json()
         if (Array.isArray(context.students)) setStudents(context.students)
+        if (Array.isArray(context.classes) && context.classes.length > 0) {
+          const firstClass = (context.classes as ClassRoomLite[])[0]
+          if (firstClass?.id) setPrimaryClassId(firstClass.id)
+        }
       } catch {
         // Keep fallback values.
+      } finally {
+        if (active) setIsLoading(false)
       }
     }
 
@@ -41,6 +51,10 @@ export default function EmployeeDashboard() {
     }
   }, [])
 
+  if (isLoading) {
+    return <RouteLoading />
+  }
+
   const quickActions = [
     {
       href: "/employee/schedule",
@@ -48,7 +62,12 @@ export default function EmployeeDashboard() {
       label: "Jadwal Mengajar",
       description: "Lihat jadwal mingguan Anda",
     },
-    { href: "/employee/class/c1", icon: LayoutGrid, label: "Kelas Saya", description: "Kelola kehadiran siswa" },
+    {
+      href: primaryClassId ? `/employee/class/${primaryClassId}` : "/employee/schedule",
+      icon: LayoutGrid,
+      label: "Kelas Saya",
+      description: "Kelola kehadiran siswa",
+    },
     { href: "/employee/grades", icon: Award, label: "Poin Keaktifan", description: "Input poin aktivitas siswa" },
     { href: "/employee/rapor", icon: BookOpen, label: "AI Rapor", description: "Generate laporan siswa" },
   ]

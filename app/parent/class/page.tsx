@@ -18,6 +18,7 @@ import {
   ChevronDown,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { RouteLoading } from "@/components/templates/route-loading"
 
 export default function ParentClassPage() {
   const [parent, setParent] = useState<any>(null)
@@ -49,12 +50,13 @@ export default function ParentClassPage() {
     load()
   }, [selectedChild?.id])
 
+  const childRank = useMemo(() => {
+    if (!selectedChild) return 0
+    return [...classmates].sort((a, b) => b.xp - a.xp).findIndex((s) => s.id === selectedChild.id) + 1
+  }, [classmates, selectedChild])
+
   if (!parent || !selectedChild) {
-    return (
-      <DashboardLayout role="PARENT" userName="Parent" userAvatar="/placeholder-user.jpg">
-        <div className="max-w-4xl mx-auto py-8 text-slate-500">Data kelas belum tersedia.</div>
-      </DashboardLayout>
-    )
+    return <RouteLoading />
   }
 
   if (!childClass) {
@@ -84,10 +86,6 @@ export default function ParentClassPage() {
     .sort((a, b) => b.xp - a.xp)
     .slice(0, 5)
   
-  const childRank = useMemo(() => [...classmates]
-    .sort((a, b) => b.xp - a.xp)
-    .findIndex(s => s.id === selectedChild.id) + 1, [classmates, selectedChild.id])
-
   // Attendance status for selected child
   const getAttendanceStatus = () => {
     switch (selectedChild.attendance) {

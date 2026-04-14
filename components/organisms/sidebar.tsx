@@ -165,7 +165,7 @@ export const Sidebar = ({ role, userName, userAvatar }: SidebarProps) => {
             className="flex items-center gap-3 px-3 py-2 w-full rounded-xl hover:bg-slate-50 transition-colors"
           >
             <img
-              src={userAvatar || "/placeholder.svg?height=40&width=40&query=avatar"}
+              src={userAvatar || "/placeholder-user.jpg"}
               alt={userName}
               className="w-10 h-10 rounded-full object-cover ring-2 ring-blue-100"
             />

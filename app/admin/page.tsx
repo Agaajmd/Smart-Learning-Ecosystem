@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
+import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassCard } from "@/components/molecules/glass-card"
 import { GlassModal } from "@/components/molecules/glass-modal"
 import { 
@@ -24,7 +25,8 @@ type ReportItem = { id: string; type: string; title: string; status: string; dat
 type InventoryItem = { id: string; name: string; total: number; working: number; broken: number }
 
 export default function AdminDashboard() {
-  const [admin, setAdmin] = useState<AdminUser>({ name: "Admin", avatar: "/placeholder-user.jpg" })
+  const [admin, setAdmin] = useState<AdminUser>({ name: "", avatar: "/placeholder-user.jpg" })
+  const [isLoading, setIsLoading] = useState(true)
   const [reports, setReports] = useState<ReportItem[]>([])
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [selectedReport, setSelectedReport] = useState<ReportItem | null>(null)
@@ -42,7 +44,9 @@ export default function AdminDashboard() {
         if (Array.isArray(data.reports)) setReports(data.reports)
         if (Array.isArray(data.inventory)) setInventory(data.inventory)
       } catch {
-        // Keep fallback mock data when API is unavailable.
+        // Keep current state when API is unavailable.
+      } finally {
+        if (active) setIsLoading(false)
       }
     }
 
@@ -51,6 +55,10 @@ export default function AdminDashboard() {
       active = false
     }
   }, [])
+
+  if (isLoading) {
+    return <RouteLoading />
+  }
 
   const pendingReports = reports.filter(r => r.status === "pending")
   const inProgressReports = reports.filter(r => r.status === "in-progress")
@@ -112,7 +120,7 @@ export default function AdminDashboard() {
   }
 
   return (
-    <DashboardLayout role="ADMIN" userName={admin.name} userAvatar={admin.avatar}>
+    <DashboardLayout role="ADMIN" userName={admin.name} userAvatar={admin.avatar || "/placeholder-user.jpg"}>
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

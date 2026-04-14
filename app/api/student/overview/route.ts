@@ -12,7 +12,7 @@ import {
   getDbTaskSubmissions,
   getDbTasks,
   type StudentReport,
-} from "@/lib/server/mock-db"
+} from "@/lib/server/data-store"
 
 export async function GET(request: Request) {
   const url = new URL(request.url)

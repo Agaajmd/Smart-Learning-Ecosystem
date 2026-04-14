@@ -7,6 +7,7 @@ import { GlassButton } from "@/components/atoms/glass-button"
 import { GlassModal } from "@/components/molecules/glass-modal"
 import { GlassInput } from "@/components/atoms/glass-input"
 import { ImageUploadModal } from "@/components/molecules/image-upload"
+import { RouteLoading } from "@/components/templates/route-loading"
 import { Mail, BookOpen, Star, Users, Calendar, Award, Edit, Clock, TrendingUp, Camera, Save, X } from "lucide-react"
 
 type Employee = {
@@ -36,13 +37,14 @@ type ClassRoom = {
 export default function EmployeeProfile() {
   const [employee, setEmployee] = useState<Employee>({
     id: "",
-    name: "Employee",
-    email: "employee@school.com",
+    name: "",
+    email: "",
     avatar: "/placeholder-user.jpg",
     subject: "-",
     rating: 0,
     classesCount: 0,
   })
+  const [isLoading, setIsLoading] = useState(true)
   const [allSchedules, setAllSchedules] = useState<Schedule[]>([])
   const [classes, setClasses] = useState<ClassRoom[]>([])
   const [showAvatarModal, setShowAvatarModal] = useState(false)
@@ -66,14 +68,27 @@ export default function EmployeeProfile() {
       const profileData = await profileRes.json()
       const contextData = await contextRes.json()
 
-      const nextEmployee = profileData.employee || employee
+      const nextEmployee = profileData.employee || {
+        id: "",
+        name: "",
+        email: "",
+        avatar: "/placeholder-user.jpg",
+        subject: "-",
+        rating: 0,
+        classesCount: 0,
+      }
       setEmployee(nextEmployee)
       setEditForm({ name: nextEmployee.name || "", email: nextEmployee.email || "", subject: nextEmployee.subject || "" })
       setAllSchedules(Array.isArray(contextData.schedules) ? contextData.schedules : [])
       setClasses(Array.isArray(contextData.classes) ? contextData.classes : [])
+      setIsLoading(false)
     }
-    load().catch(() => {})
+    load().catch(() => setIsLoading(false))
   }, [])
+
+  if (isLoading) {
+    return <RouteLoading />
+  }
 
   const employeeSchedule = useMemo(() => allSchedules.filter((s) => s.teacherId === employee.id), [allSchedules, employee.id])
   const uniqueClasses = useMemo(() => [...new Set(employeeSchedule.map((s) => s.classId))], [employeeSchedule])

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { GlassCard } from "@/components/molecules/glass-card"
+import { RouteLoading } from "@/components/templates/route-loading"
 import { Clock, MapPin, Users, ChevronLeft, ChevronRight } from "lucide-react"
 
 type Employee = { id: string; name: string }
@@ -11,25 +12,34 @@ type ClassRoom = { id: string; name: string; rows: number; cols: number }
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
 
 export default function EmployeeSchedule() {
-  const [employee, setEmployee] = useState<Employee>({ id: "", name: "Employee" })
+  const [employee, setEmployee] = useState<Employee>({ id: "", name: "" })
+  const [isLoading, setIsLoading] = useState(true)
   const [selectedDay, setSelectedDay] = useState("Monday")
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [classes, setClasses] = useState<ClassRoom[]>([])
 
   useEffect(() => {
     const load = async () => {
-      const res = await fetch("/api/employee/context", { cache: "no-store" })
-      if (!res.ok) return
-      const data = await res.json()
-      setEmployee(data.employee || { id: "", name: "Employee" })
-      setSchedules(Array.isArray(data.schedules) ? data.schedules : [])
-      setClasses(Array.isArray(data.classes) ? data.classes : [])
+      try {
+        const res = await fetch("/api/employee/context", { cache: "no-store" })
+        if (!res.ok) return
+        const data = await res.json()
+        setEmployee(data.employee || { id: "", name: "" })
+        setSchedules(Array.isArray(data.schedules) ? data.schedules : [])
+        setClasses(Array.isArray(data.classes) ? data.classes : [])
+      } finally {
+        setIsLoading(false)
+      }
     }
     load().catch(() => {})
   }, [])
 
   const employeeSchedule = useMemo(() => schedules.filter((s) => s.teacherId === employee.id), [schedules, employee.id])
   const todaySchedule = useMemo(() => employeeSchedule.filter((s) => s.day === selectedDay), [employeeSchedule, selectedDay])
+
+  if (isLoading) {
+    return <RouteLoading />
+  }
 
   const currentDayIndex = DAYS.indexOf(selectedDay)
   const navigateDay = (direction: "prev" | "next") => {

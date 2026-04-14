@@ -6,7 +6,7 @@ import {
   getDbCanteens,
   setDbCanteenOwners,
   setDbCanteens,
-} from "@/lib/server/mock-db"
+} from "@/lib/server/data-store"
 import { logAudit } from "@/lib/server/audit-log"
 
 export async function GET() {
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     password,
     role: "CANTEEN_OWNER",
     phone,
-    avatar: "/placeholder.svg?height=100&width=100",
+    avatar: "/placeholder-user.jpg",
   })
 
   const canteenId = `can-${Date.now()}`

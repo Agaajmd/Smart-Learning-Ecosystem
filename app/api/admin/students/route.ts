@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { createDbUser } from "@/lib/server/google-sheets-auth"
-import { getDbStudents, setDbStudents } from "@/lib/server/mock-db"
+import { getDbStudents, setDbStudents } from "@/lib/server/data-store"
 import { logAudit } from "@/lib/server/audit-log"
 
 export async function POST(request: Request) {
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     password,
     role: "STUDENT",
     classId,
-    avatar: "/placeholder.svg",
+    avatar: "/placeholder-user.jpg",
   })
 
   const next = {

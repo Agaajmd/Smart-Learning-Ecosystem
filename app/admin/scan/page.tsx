@@ -4,7 +4,9 @@ import type React from "react"
 
 import { useEffect, useState } from "react"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
+import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassCard } from "@/components/molecules/glass-card"
+import { EmptySkeleton } from "@/components/molecules/empty-skeleton"
 import { GlassButton } from "@/components/atoms/glass-button"
 import { GlassTextarea } from "@/components/atoms/glass-textarea"
 import { GlassModal } from "@/components/molecules/glass-modal"
@@ -43,7 +45,7 @@ interface AssetReport {
 }
 
 export default function AdminReportsPage() {
-  const [admin, setAdmin] = useState({ name: "Admin", avatar: "/placeholder-user.jpg" })
+  const [admin, setAdmin] = useState<{ name: string; avatar: string } | null>(null)
   const [reports, setReports] = useState<AssetReport[]>([])
   const [selectedReport, setSelectedReport] = useState<AssetReport | null>(null)
   const [filterStatus, setFilterStatus] = useState<"all" | "pending" | "in_progress" | "resolved">("all")
@@ -192,6 +194,10 @@ export default function AdminReportsPage() {
   const inProgressCount = reports.filter((r) => r.status === "in_progress").length
   const resolvedCount = reports.filter((r) => r.status === "resolved").length
 
+  if (!admin) {
+    return <RouteLoading />
+  }
+
   return (
     <DashboardLayout role="ADMIN" userName={admin.name} userAvatar={admin.avatar}>
       <div className="max-w-2xl mx-auto space-y-6">
@@ -276,9 +282,8 @@ export default function AdminReportsPage() {
         {/* Reports List */}
         <div className="space-y-3">
           {filteredReports.length === 0 ? (
-            <GlassCard className="text-center py-8">
-              <Package className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500">Tidak ada laporan ditemukan</p>
+            <GlassCard>
+              <EmptySkeleton rows={3} className="py-4" />
             </GlassCard>
           ) : (
             filteredReports.map((report) => (

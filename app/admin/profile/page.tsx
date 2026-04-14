@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
+import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassCard } from "@/components/molecules/glass-card"
 import { GlassModal } from "@/components/molecules/glass-modal"
 import { GlassButton } from "@/components/atoms/glass-button"
@@ -26,10 +27,11 @@ type AdminUser = { id?: string; name: string; email: string; avatar: string }
 
 export default function AdminProfile() {
   const [admin, setAdmin] = useState<AdminUser>({
-    name: "Admin",
-    email: "admin@school.com",
+    name: "",
+    email: "",
     avatar: "/placeholder-user.jpg",
   })
+  const [isLoading, setIsLoading] = useState(true)
   const [stats, setStats] = useState({ studentsCount: 0, employeesCount: 0, classesCount: 0 })
   const [recentActivities, setRecentActivities] = useState<Array<{ action: string; time: string; status: string }>>([])
   const [showEditModal, setShowEditModal] = useState(false)
@@ -60,6 +62,8 @@ export default function AdminProfile() {
         if (Array.isArray(data.recentActivities)) setRecentActivities(data.recentActivities)
       } catch {
         // Keep fallback values.
+      } finally {
+        if (active) setIsLoading(false)
       }
     }
 
@@ -68,6 +72,10 @@ export default function AdminProfile() {
       active = false
     }
   }, [])
+
+  if (isLoading) {
+    return <RouteLoading />
+  }
 
   const handleSaveProfile = async () => {
     if (!admin.id || isSavingProfile) return
@@ -129,7 +137,7 @@ export default function AdminProfile() {
   }
 
   return (
-    <DashboardLayout role="ADMIN" userName={admin.name} userAvatar={admin.avatar}>
+    <DashboardLayout role="ADMIN" userName={admin.name} userAvatar={admin.avatar || "/placeholder-user.jpg"}>
       <div className="max-w-2xl mx-auto space-y-5 px-1">
         {/* Profile Header */}
         <GlassCard className="relative overflow-hidden">
@@ -138,7 +146,7 @@ export default function AdminProfile() {
           <div className="relative z-10 flex flex-col items-center text-center">
             <div className="relative">
               <img
-                src={admin.avatar || "/placeholder.svg?height=120&width=120&query=admin professional portrait"}
+                src={admin.avatar || "/placeholder-user.jpg"}
                 alt={admin.name}
                 className="w-24 h-24 rounded-full border-4 border-amber-100 object-cover"
               />

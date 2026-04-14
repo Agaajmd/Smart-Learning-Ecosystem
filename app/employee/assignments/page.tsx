@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { GlassCard } from "@/components/molecules/glass-card"
 import { GlassButton } from "@/components/atoms/glass-button"
 import { GlassModal } from "@/components/molecules/glass-modal"
+import { EmptySkeleton } from "@/components/molecules/empty-skeleton"
 import {
   FileText,
   Plus,
@@ -321,12 +322,13 @@ export default function EmployeeAssignmentsPage() {
 
         <div className="space-y-3">
           {getTaskList().length === 0 ? (
-            <GlassCard className="text-center py-8">
-              <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500">Belum ada tugas</p>
+            <GlassCard className="py-4">
+              <EmptySkeleton rows={3} />
+              <div className="text-center pt-2">
               <GlassButton variant="outline" size="sm" onClick={openCreateModal} className="mt-3">
                 <Plus className="w-4 h-4 mr-1" /> Buat Tugas Pertama
               </GlassButton>
+              </div>
             </GlassCard>
           ) : (
             getTaskList().map((task) => {
@@ -443,7 +445,7 @@ export default function EmployeeAssignmentsPage() {
               {(() => {
                 const submissions = allSubmissions.filter((s) => s.taskId === selectedTask.id)
                 if (submissions.length === 0) {
-                  return <div className="text-center py-8"><Users className="w-12 h-12 text-slate-300 mx-auto mb-3" /><p className="text-slate-500">Belum ada yang mengumpulkan</p></div>
+                  return <EmptySkeleton rows={2} className="py-4" />
                 }
                 return submissions.map((sub) => (
                   <div key={sub.id} className="p-3 rounded-xl bg-slate-50 border border-slate-100 space-y-2">

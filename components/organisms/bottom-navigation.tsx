@@ -251,7 +251,7 @@ export const BottomNavigation = ({ role, userName, userAvatar }: BottomNavigatio
           >
             <div className="relative">
               <img
-                src={userAvatar || "/placeholder.svg?height=56&width=56"}
+                src={userAvatar || "/placeholder-user.jpg"}
                 alt={userName || "User"}
                 className="w-14 h-14 rounded-2xl object-cover ring-2 ring-white shadow-lg"
               />

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { type ActivityPoint } from "@/lib/data-model"
-import { getDbActivityPoints, setDbActivityPoints } from "@/lib/server/mock-db"
+import { getDbActivityPoints, setDbActivityPoints } from "@/lib/server/data-store"
 import { logAudit } from "@/lib/server/audit-log"
 
 export async function POST(request: Request) {

@@ -4,7 +4,7 @@ import {
   getDbStudents,
   setDbClasses,
   setDbStudents,
-} from "@/lib/server/mock-db"
+} from "@/lib/server/data-store"
 import { logAudit } from "@/lib/server/audit-log"
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ classId: string }> }) {

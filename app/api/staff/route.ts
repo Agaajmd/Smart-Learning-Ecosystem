@@ -8,7 +8,7 @@ import {
   getDbTeachers,
   setDbAdmins,
   setDbTeachers,
-} from "@/lib/server/mock-db"
+} from "@/lib/server/data-store"
 import { logAudit } from "@/lib/server/audit-log"
 import { getSessionUser } from "@/lib/server/session-user"
 
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
     email,
     password,
     role: type === "teacher" ? "EMPLOYEE" : "ADMIN",
-    avatar: "/placeholder.svg?height=100&width=100",
+    avatar: "/placeholder-user.jpg",
   })
 
   if (type === "teacher") {

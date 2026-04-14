@@ -14,6 +14,7 @@ import {
   Star,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { RouteLoading } from "@/components/templates/route-loading"
 
 export default function StudentClassPage() {
   const [student, setStudent] = useState<any>(null)
@@ -39,12 +40,13 @@ export default function StudentClassPage() {
     load()
   }, [])
 
+  const myRank = useMemo(() => {
+    if (!student) return 0
+    return [...classmates].sort((a, b) => b.xp - a.xp).findIndex((s) => s.id === student.id) + 1
+  }, [classmates, student])
+
   if (!student) {
-    return (
-      <DashboardLayout role="STUDENT" userName="Student" userAvatar="/placeholder-user.jpg">
-        <div className="max-w-4xl mx-auto py-8 text-slate-500">Data kelas belum tersedia.</div>
-      </DashboardLayout>
-    )
+    return <RouteLoading />
   }
 
   if (!studentClass) {
@@ -74,10 +76,6 @@ export default function StudentClassPage() {
     .sort((a, b) => b.xp - a.xp)
     .slice(0, 5)
   
-  const myRank = useMemo(() => [...classmates]
-    .sort((a, b) => b.xp - a.xp)
-    .findIndex(s => s.id === student.id) + 1, [classmates, student.id])
-
   return (
     <DashboardLayout role="STUDENT" userName={student.name} userAvatar={student.avatar}>
       <div className="max-w-4xl mx-auto space-y-6 px-1">

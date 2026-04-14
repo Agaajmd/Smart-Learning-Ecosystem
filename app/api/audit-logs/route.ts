@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getDbAuditLogs } from "@/lib/server/mock-db"
+import { getDbAuditLogs } from "@/lib/server/data-store"
 
 export async function GET(request: Request) {
   const url = new URL(request.url)

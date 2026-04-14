@@ -9,7 +9,7 @@ import {
   getDbParents,
   getDbPayments,
   getDbSchedules,
-} from "@/lib/server/mock-db"
+} from "@/lib/server/data-store"
 
 export async function GET(request: Request) {
   const url = new URL(request.url)

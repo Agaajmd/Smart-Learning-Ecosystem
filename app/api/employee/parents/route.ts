@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { createDbUser, updateDbUserById, deactivateDbUserById } from "@/lib/server/google-sheets-auth"
-import { getDbParents, getDbStudents, setDbParents } from "@/lib/server/mock-db"
+import { getDbParents, getDbStudents, setDbParents } from "@/lib/server/data-store"
 import { logAudit } from "@/lib/server/audit-log"
 
 export async function GET(request: Request) {
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     email,
     password,
     role: "PARENT",
-    avatar: "/placeholder.svg",
+    avatar: "/placeholder-user.jpg",
   })
 
   const next = {

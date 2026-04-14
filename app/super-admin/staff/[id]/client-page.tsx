@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
+import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassCard } from "@/components/molecules/glass-card"
+import { EmptySkeleton } from "@/components/molecules/empty-skeleton"
 import { GlassButton } from "@/components/atoms/glass-button"
 import type { ClassRoom, Employee, Schedule, Task, TaskSubmission, User } from "@/lib/data-model"
 import {
@@ -38,8 +40,8 @@ export default function StaffDetailClient({ id }: ClientPageProps) {
     const load = async () => {
       try {
         const [staffRes, baseRes] = await Promise.all([
-          fetch(`/api/staff/${id}`, { cache: "no-store" }),
-          fetch("/api/staff", { cache: "no-store" }),
+          fetch(`/api/super-admin/staff/${id}`, { cache: "no-store" }),
+          fetch("/api/super-admin/staff", { cache: "no-store" }),
         ])
 
         if (!staffRes.ok) throw new Error("Staff tidak ditemukan")
@@ -63,32 +65,36 @@ export default function StaffDetailClient({ id }: ClientPageProps) {
     load()
   }, [id])
 
+  const teacher = useMemo(() => (type === "teacher" && staff ? (staff as Employee) : null), [type, staff])
+
   const gradedSubmissions = useMemo(() => taskSubmissions.filter((submission) => submission.status === "GRADED"), [taskSubmissions])
 
   const performanceData = useMemo(() => {
-    const taskCompletion = taskSubmissions.length > 0 ? Math.round((gradedSubmissions.length / taskSubmissions.length) * 100) : 0
+    const ratingScore = teacher ? Math.round(Math.min(Math.max(teacher.rating, 0), 5) * 20) : null
+    const taskCompletion = taskSubmissions.length > 0 ? Math.round((gradedSubmissions.length / taskSubmissions.length) * 100) : null
+    const attendanceRate = null
+    const studentSatisfaction = ratingScore
+    const values = [ratingScore, taskCompletion, attendanceRate, studentSatisfaction].filter(
+      (value): value is number => typeof value === "number",
+    )
     return {
-      teachingScore: 85,
-      attendanceRate: 95,
+      teachingScore: ratingScore,
+      attendanceRate,
       taskCompletion,
-      studentSatisfaction: 88,
-      overallScore: Math.round((85 + 95 + taskCompletion + 88) / 4),
+      studentSatisfaction,
+      overallScore: values.length > 0 ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : null,
     }
-  }, [taskSubmissions.length, gradedSubmissions.length])
+  }, [gradedSubmissions.length, taskSubmissions.length, teacher])
+
+  const formatPercent = (value: number | null) => (typeof value === "number" ? `${value}%` : "-")
 
   if (isLoading) {
-    return (
-      <DashboardLayout role="SUPER_ADMIN" userName="Kepala Sekolah" userAvatar="/placeholder-user.jpg">
-        <div className="w-full max-w-4xl mx-auto">
-          <GlassCard className="text-center py-12 text-slate-500">Memuat detail staff...</GlassCard>
-        </div>
-      </DashboardLayout>
-    )
+    return <RouteLoading />
   }
 
   if (!staff) {
     return (
-      <DashboardLayout role="SUPER_ADMIN" userName="Kepala Sekolah" userAvatar="/placeholder-user.jpg">
+      <DashboardLayout role="SUPER_ADMIN" userName="" userAvatar="/placeholder-user.jpg">
         <div className="w-full max-w-4xl mx-auto">
           <GlassCard className="text-center py-12">
             <UserIcon className="w-16 h-16 mx-auto mb-4 text-slate-300" />
@@ -103,12 +109,10 @@ export default function StaffDetailClient({ id }: ClientPageProps) {
     )
   }
 
-  const teacher = type === "teacher" ? (staff as Employee) : null
-
   return (
     <DashboardLayout
       role="SUPER_ADMIN"
-      userName={superAdmin?.name || "Kepala Sekolah"}
+      userName={superAdmin?.name || ""}
       userAvatar={superAdmin?.avatar || "/placeholder-user.jpg"}
     >
       <div className="w-full max-w-4xl mx-auto space-y-4 sm:space-y-6">
@@ -119,14 +123,14 @@ export default function StaffDetailClient({ id }: ClientPageProps) {
 
         <GlassCard className="bg-gradient-to-br from-purple-50 to-blue-50 border-purple-200">
           <div className="flex flex-col sm:flex-row items-center gap-4">
-            <img src={staff.avatar} alt={staff.name} className="w-24 h-24 rounded-2xl object-cover border-2 border-slate-200" />
+            <img src={staff.avatar || "/placeholder-user.jpg"} alt={staff.name} className="w-24 h-24 rounded-2xl object-cover border-2 border-slate-200" />
             <div className="text-center sm:text-left flex-1">
               <h1 className="text-2xl font-bold text-slate-800">{staff.name}</h1>
               <p className="text-purple-600">{teacher ? `Guru ${teacher.subject}` : "Administrator"}</p>
             </div>
             <div className="text-center">
               <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
-                <span className="text-2xl font-bold text-white">{performanceData.overallScore}</span>
+                <span className="text-2xl font-bold text-white">{performanceData.overallScore ?? "-"}</span>
               </div>
               <p className="text-xs text-slate-500 mt-1">Skor Kinerja</p>
             </div>
@@ -181,22 +185,22 @@ export default function StaffDetailClient({ id }: ClientPageProps) {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="p-4 bg-slate-50 rounded-xl text-center">
               <BookOpen className="w-6 h-6 mx-auto mb-2 text-blue-500" />
-              <p className="text-2xl font-bold text-slate-800">{performanceData.teachingScore}%</p>
+              <p className="text-2xl font-bold text-slate-800">{formatPercent(performanceData.teachingScore)}</p>
               <p className="text-xs text-slate-500">Kualitas Mengajar</p>
             </div>
             <div className="p-4 bg-slate-50 rounded-xl text-center">
               <Clock className="w-6 h-6 mx-auto mb-2 text-green-500" />
-              <p className="text-2xl font-bold text-slate-800">{performanceData.attendanceRate}%</p>
+              <p className="text-2xl font-bold text-slate-800">{formatPercent(performanceData.attendanceRate)}</p>
               <p className="text-xs text-slate-500">Kehadiran</p>
             </div>
             <div className="p-4 bg-slate-50 rounded-xl text-center">
               <ClipboardList className="w-6 h-6 mx-auto mb-2 text-purple-500" />
-              <p className="text-2xl font-bold text-slate-800">{performanceData.taskCompletion}%</p>
+              <p className="text-2xl font-bold text-slate-800">{formatPercent(performanceData.taskCompletion)}</p>
               <p className="text-xs text-slate-500">Penyelesaian Tugas</p>
             </div>
             <div className="p-4 bg-slate-50 rounded-xl text-center">
               <CheckCircle className="w-6 h-6 mx-auto mb-2 text-yellow-500" />
-              <p className="text-2xl font-bold text-slate-800">{performanceData.studentSatisfaction}%</p>
+              <p className="text-2xl font-bold text-slate-800">{formatPercent(performanceData.studentSatisfaction)}</p>
               <p className="text-xs text-slate-500">Kepuasan Siswa</p>
             </div>
           </div>
@@ -209,7 +213,7 @@ export default function StaffDetailClient({ id }: ClientPageProps) {
           </h2>
 
           {schedules.length === 0 ? (
-            <p className="text-center text-slate-500 py-4">Belum ada jadwal mengajar</p>
+            <EmptySkeleton rows={3} className="py-4" />
           ) : (
             <div className="space-y-2">
               {schedules.slice(0, 8).map((schedule) => {

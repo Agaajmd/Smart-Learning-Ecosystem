@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
+import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassCard } from "@/components/molecules/glass-card"
+import { EmptySkeleton } from "@/components/molecules/empty-skeleton"
 import { GlassButton } from "@/components/atoms/glass-button"
 import { GlassModal } from "@/components/molecules/glass-modal"
 import { GlassInput } from "@/components/atoms/glass-input"
@@ -28,7 +30,7 @@ type PiketSchedule = { id: string; classId: string; day: string; studentIds: str
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 
 export default function AdminSchedulePage() {
-  const [admin, setAdmin] = useState({ name: "Admin", avatar: "/placeholder-user.jpg" })
+  const [admin, setAdmin] = useState<{ name: string; avatar: string } | null>(null)
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [classes, setClasses] = useState<ClassRoom[]>([])
   const [teachers, setTeachers] = useState<Teacher[]>([])
@@ -57,7 +59,7 @@ export default function AdminSchedulePage() {
     const res = await fetch("/api/admin/schedule", { cache: "no-store" })
     if (!res.ok) throw new Error("Gagal memuat data jadwal")
     const data = await res.json()
-    setAdmin(data.admin || { name: "Admin", avatar: "/placeholder-user.jpg" })
+    setAdmin(data.admin || null)
     setSchedules(Array.isArray(data.schedules) ? data.schedules : [])
     setClasses(Array.isArray(data.classes) ? data.classes : [])
     setTeachers(Array.isArray(data.teachers) ? data.teachers : [])
@@ -163,6 +165,10 @@ export default function AdminSchedulePage() {
     }
   }
 
+  if (!admin) {
+    return <RouteLoading />
+  }
+
   return (
     <DashboardLayout role="ADMIN" userName={admin.name} userAvatar={admin.avatar}>
       <div className="w-full max-w-4xl mx-auto space-y-4 sm:space-y-6">
@@ -247,7 +253,7 @@ export default function AdminSchedulePage() {
                 </div>
               </div>
             ))}
-            {filteredSchedules.length === 0 && <div className="text-center py-8 text-slate-400">Tidak ada jadwal untuk hari ini</div>}
+            {filteredSchedules.length === 0 && <EmptySkeleton rows={3} className="py-4" />}
           </div>
         </GlassCard>
 

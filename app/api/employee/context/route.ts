@@ -8,7 +8,7 @@ import {
   getDbTaskSubmissions,
   getDbTasks,
   getDbTeachers,
-} from "@/lib/server/mock-db"
+} from "@/lib/server/data-store"
 
 export async function GET() {
   const sessionUser = await getSessionUser()

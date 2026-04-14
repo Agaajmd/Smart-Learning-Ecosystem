@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { getAllDbUsers, updateDbUserById } from "@/lib/server/google-sheets-auth"
-import { getDbClasses } from "@/lib/server/mock-db"
+import { getDbClasses } from "@/lib/server/data-store"
 
 export async function GET(request: Request) {
   const url = new URL(request.url)

@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
+import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassCard } from "@/components/molecules/glass-card"
+import { EmptySkeleton } from "@/components/molecules/empty-skeleton"
 import { GlassInput } from "@/components/atoms/glass-input"
 import { GlassModal } from "@/components/molecules/glass-modal"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
@@ -142,8 +144,12 @@ export default function AdminUsersPage() {
     }
   }
 
+  if (!admin) {
+    return <RouteLoading />
+  }
+
   return (
-    <DashboardLayout role="ADMIN" userName={admin?.name || "Admin"} userAvatar={admin?.avatar || "/placeholder-user.jpg"}>
+    <DashboardLayout role="ADMIN" userName={admin.name} userAvatar={admin.avatar || "/placeholder-user.jpg"}>
       <div className="w-full max-w-4xl mx-auto space-y-4 sm:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
           <div>
@@ -196,9 +202,7 @@ export default function AdminUsersPage() {
         <GlassCard>
           <div className="space-y-2 sm:space-y-3">
             {users.length === 0 ? (
-              <div className="text-center py-8 sm:py-12">
-                <p className="text-sm sm:text-base text-slate-500">Tidak ada pengguna ditemukan</p>
-              </div>
+              <EmptySkeleton rows={4} className="py-4" />
             ) : (
               users.map((user) => (
                 <div

@@ -7,6 +7,7 @@ import { GamificationStats } from "@/components/organisms/gamification-stats"
 import { NextClassCard } from "@/components/organisms/next-class-card"
 import { AttendanceLeaderboard } from "@/components/organisms/attendance-leaderboard"
 import { ClassRoomGrid } from "@/components/organisms/class-room-grid"
+import { RouteLoading } from "@/components/templates/route-loading"
 
 export default function StudentDashboard() {
   const [student, setStudent] = useState<any>(null)
@@ -37,11 +38,7 @@ export default function StudentDashboard() {
   }, [])
 
   if (!student) {
-    return (
-      <DashboardLayout role="STUDENT" userName="Student" userAvatar="/placeholder-user.jpg">
-        <div className="max-w-2xl mx-auto px-1 py-8 text-slate-500">Data siswa belum tersedia.</div>
-      </DashboardLayout>
-    )
+    return <RouteLoading />
   }
 
   return (

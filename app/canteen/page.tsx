@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
+import { EmptySkeleton } from "@/components/molecules/empty-skeleton"
 import { 
   Search,
   Store,
@@ -408,9 +409,8 @@ export default function CanteenPage() {
           </div>
 
           {filteredProducts.length === 0 && (
-            <div className="text-center py-12">
-              <Utensils className="w-16 h-16 text-slate-200 mx-auto mb-4" />
-              <p className="text-slate-500">Tidak ada menu ditemukan</p>
+            <div className="bg-white rounded-2xl p-2">
+              <EmptySkeleton rows={4} className="py-4" />
             </div>
           )}
         </section>

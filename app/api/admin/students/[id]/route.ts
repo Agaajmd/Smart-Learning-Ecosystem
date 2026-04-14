@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { deactivateDbUserById, updateDbUserById } from "@/lib/server/google-sheets-auth"
-import { getDbStudents, setDbStudents } from "@/lib/server/mock-db"
+import { getDbStudents, setDbStudents } from "@/lib/server/data-store"
 import { logAudit } from "@/lib/server/audit-log"
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {

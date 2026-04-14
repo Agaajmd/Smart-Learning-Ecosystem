@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
+import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassCard } from "@/components/molecules/glass-card"
+import { EmptySkeleton } from "@/components/molecules/empty-skeleton"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { 
   ArrowLeft,
@@ -36,7 +38,7 @@ type Order = {
 }
 
 export default function CanteenOwnerOrdersPage() {
-  const [owner, setOwner] = useState<Owner>({ id: "", name: "Owner", avatar: "/placeholder-user.jpg", canteenId: "" })
+  const [owner, setOwner] = useState<Owner | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
   const [filterStatus, setFilterStatus] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
@@ -144,6 +146,10 @@ export default function CanteenOwnerOrdersPage() {
     ],
     [orders.length, statusCounts],
   )
+
+  if (!owner) {
+    return <RouteLoading />
+  }
 
   return (
     <DashboardLayout role="CANTEEN_OWNER" userName={owner.name} userAvatar={owner.avatar}>
@@ -284,9 +290,8 @@ export default function CanteenOwnerOrdersPage() {
         </div>
 
         {filteredOrders.length === 0 && (
-          <GlassCard className="p-8 text-center">
-            <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-500">Tidak ada order ditemukan</p>
+          <GlassCard>
+            <EmptySkeleton rows={3} className="py-4" />
           </GlassCard>
         )}
       </div>

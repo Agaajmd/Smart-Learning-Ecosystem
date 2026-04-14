@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+import { RouteLoading } from "@/components/templates/route-loading"
 
 export default function ParentFinancePage() {
   const [parent, setParent] = useState<Parent | null>(null)
@@ -47,11 +48,7 @@ export default function ParentFinancePage() {
   }, [selectedChild?.id])
 
   if (!parent || !selectedChild) {
-    return (
-      <DashboardLayout role="PARENT" userName="Parent" userAvatar="/placeholder-user.jpg">
-        <div className="max-w-4xl mx-auto py-8 text-slate-500">Data keuangan belum tersedia.</div>
-      </DashboardLayout>
-    )
+    return <RouteLoading />
   }
 
   const filteredPayments = filterStatus === "all" 

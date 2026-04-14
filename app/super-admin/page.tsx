@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
+import { RouteLoading } from "@/components/templates/route-loading"
 import { FinancialChart } from "@/components/organisms/financial-chart"
 import { EmployeeLeaderboard } from "@/components/organisms/employee-leaderboard"
 import { 
@@ -26,7 +27,7 @@ import {
 import Link from "next/link"
 
 export default function SuperAdminDashboard() {
-  const [superAdmin, setSuperAdmin] = useState({ name: "Kepala Sekolah", avatar: "/placeholder-user.jpg" })
+  const [superAdmin, setSuperAdmin] = useState<{ name: string; avatar: string } | null>(null)
   const [financialData, setFinancialData] = useState<Array<{ month: string; income: number; expenses: number }>>([])
   const [employees, setEmployees] = useState<any[]>([])
   const [students, setStudents] = useState<any[]>([])
@@ -45,7 +46,7 @@ export default function SuperAdminDashboard() {
     let active = true
     const load = async () => {
       try {
-        const res = await fetch("/api/dashboard/super-admin", { cache: "no-store" })
+        const res = await fetch("/api/super-admin/overview", { cache: "no-store" })
         if (!res.ok) return
         const data = await res.json()
         if (!active) return
@@ -91,6 +92,10 @@ export default function SuperAdminDashboard() {
     { href: "/super-admin/finance", icon: BarChart3, label: "Keuangan", description: "Kelola keuangan sekolah", color: "bg-emerald-500" },
     { href: "/super-admin/staff", icon: Users, label: "Manajemen Staff", description: "Kelola staff, admin, dan pengaturan akses", color: "bg-blue-500" },
   ]
+
+  if (!superAdmin) {
+    return <RouteLoading />
+  }
 
   return (
     <DashboardLayout role="SUPER_ADMIN" userName={superAdmin.name} userAvatar={superAdmin.avatar}>

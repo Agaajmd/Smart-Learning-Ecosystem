@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
+import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassCard } from "@/components/molecules/glass-card"
+import { EmptySkeleton } from "@/components/molecules/empty-skeleton"
 import type { AttendanceRecord, Parent, Student } from "@/lib/data-model"
 import { 
   CalendarCheck,
@@ -60,8 +62,12 @@ export default function ParentAttendancePage() {
     { value: "2025-10", label: "Oktober 2025" },
   ]
 
+  if (!parent) {
+    return <RouteLoading />
+  }
+
   return (
-    <DashboardLayout role="PARENT" userName={parent?.name || "Parent"} userAvatar={parent?.avatar || "/placeholder-user.jpg"}>
+    <DashboardLayout role="PARENT" userName={parent.name} userAvatar={parent.avatar || "/placeholder-user.jpg"}>
       <div className="max-w-4xl mx-auto space-y-6 px-1">
         {/* Header */}
         <div className="flex items-center gap-3">
@@ -203,9 +209,8 @@ export default function ParentAttendancePage() {
               </GlassCard>
             ))
           ) : (
-            <GlassCard className="p-8 text-center">
-              <CalendarCheck className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500">Belum ada data kehadiran untuk bulan ini</p>
+            <GlassCard>
+              <EmptySkeleton rows={4} className="py-4" />
             </GlassCard>
           )}
         </div>
