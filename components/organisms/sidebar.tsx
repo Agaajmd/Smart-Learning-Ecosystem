@@ -26,15 +26,22 @@ import {
   TrendingUp,
   Award,
   Utensils,
+  SlidersHorizontal,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth"
 import type { UserRole } from "@/lib/data-model"
+import {
+  getPageFeatureKeyForPath,
+  isPageFeatureEnabled,
+  type PageFeatureStateMap,
+} from "@/lib/page-features"
 
 interface SidebarProps {
   role: UserRole
   userName: string
   userAvatar: string
+  featureState?: PageFeatureStateMap
 }
 
 type SidebarNavItem = {
@@ -45,11 +52,18 @@ type SidebarNavItem = {
   disabledReason?: string
 }
 
-export const Sidebar = ({ role, userName, userAvatar }: SidebarProps) => {
+export const Sidebar = ({ role, userName, userAvatar, featureState }: SidebarProps) => {
   const pathname = usePathname()
   const { logout } = useAuth()
   const [showUserMenu, setShowUserMenu] = useState(false)
   const profilePath = `/${role.toLowerCase().replace("_", "-")}/profile`
+  const resolvedAvatar = (() => {
+    const next = String(userAvatar || "").trim()
+    if (!next || next === "null" || next === "undefined") {
+      return "/placeholder-user.jpg"
+    }
+    return next
+  })()
 
   const getNavItems = (): SidebarNavItem[] => {
     switch (role) {
@@ -88,6 +102,7 @@ export const Sidebar = ({ role, userName, userAvatar }: SidebarProps) => {
           { href: "/super-admin", icon: Home, label: "Dashboard" },
           { href: "/super-admin/finance", icon: BarChart3, label: "Keuangan" },
           { href: "/super-admin/staff", icon: Users, label: "Manajemen Staff" },
+          { href: "/super-admin/features", icon: SlidersHorizontal, label: "Manajemen Fitur" },
           { href: "/canteen", icon: Utensils, label: "Kantin" },
         ]
       case "PARENT":
@@ -113,7 +128,17 @@ export const Sidebar = ({ role, userName, userAvatar }: SidebarProps) => {
     }
   }
 
-  const navItems = getNavItems()
+  const navItems = getNavItems().map((item) => {
+    const featureKey = getPageFeatureKeyForPath(item.href, role)
+    if (!featureKey) return item
+    if (isPageFeatureEnabled(featureKey, featureState)) return item
+
+    return {
+      ...item,
+      disabled: true,
+      disabledReason: "Fitur ini dinonaktifkan oleh Kepala Sekolah",
+    }
+  })
 
   const roleLabels: Record<UserRole, string> = {
     STUDENT: "Student",
@@ -193,7 +218,7 @@ export const Sidebar = ({ role, userName, userAvatar }: SidebarProps) => {
             className="flex items-center gap-3 px-3 py-2 w-full rounded-xl hover:bg-slate-50 transition-colors"
           >
             <img
-              src={userAvatar || "/placeholder-user.jpg"}
+              src={resolvedAvatar}
               alt={userName}
               className="w-10 h-10 rounded-full object-cover ring-2 ring-blue-100"
             />

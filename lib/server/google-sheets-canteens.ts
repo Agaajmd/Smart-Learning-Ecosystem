@@ -2,6 +2,7 @@ import "server-only"
 
 import { google } from "googleapis"
 import type { Canteen } from "@/lib/data-model"
+import { getImageUrl, normalizeDriveMediaUrl } from "@/lib/google-drive"
 
 const CANTEENS_SHEET_NAME = "canteens"
 const CANTEENS_COLUMNS = [
@@ -70,7 +71,7 @@ function normalizeCanteenRow(row: string[]): Canteen {
     name: row[1] || "",
     ownerId: row[2] || "",
     description: row[3] || "",
-    image: row[4] || "/placeholder.svg?height=200&width=300&query=food+stall",
+    image: getImageUrl(row[4], ""),
     rating: Number(row[5] || 0),
     totalOrders: Number(row[6] || 0),
     isOpen: String(row[7] || "true").toLowerCase() !== "false",
@@ -178,7 +179,7 @@ export async function createDbCanteen(input: {
     name: input.name.trim(),
     ownerId: input.ownerId,
     description: input.description || "",
-    image: input.image || "/placeholder.svg?height=200&width=300&query=food+stall",
+    image: normalizeDriveMediaUrl(input.image) || "",
     rating: Number(input.rating || 0),
     totalOrders: Number(input.totalOrders || 0),
     isOpen: input.isOpen !== false,
@@ -231,7 +232,7 @@ export async function updateDbCanteenById(input: {
     name: input.name?.trim() || current.name,
     ownerId: input.ownerId || current.ownerId,
     description: input.description != null ? input.description : current.description,
-    image: input.image || current.image,
+    image: input.image != null ? normalizeDriveMediaUrl(input.image) || "" : current.image,
     rating: input.rating != null ? Number(input.rating) : current.rating,
     totalOrders: input.totalOrders != null ? Number(input.totalOrders) : current.totalOrders,
     isOpen: input.isOpen != null ? Boolean(input.isOpen) : current.isOpen,

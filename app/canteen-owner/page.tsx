@@ -1,10 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
 import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassCard } from "@/components/molecules/glass-card"
-import { EmptySkeleton } from "@/components/molecules/empty-skeleton"
 import { 
   Package,
   ShoppingBag,
@@ -38,26 +37,54 @@ type Order = {
   notes?: string
 }
 
+const fetchWithTimeout = async (input: RequestInfo | URL, init?: RequestInit, timeoutMs = 12000) => {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal })
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
 export default function CanteenOwnerDashboard() {
   const [owner, setOwner] = useState<Owner | null>(null)
   const [canteen, setCanteen] = useState<Canteen | null>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [orders, setOrders] = useState<Order[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
     const load = async () => {
+      setIsLoading(true)
+      setLoadError(null)
       try {
-        const res = await fetch("/api/dashboard/canteen-owner", { cache: "no-store" })
-        if (!res.ok) return
+        const res = await fetchWithTimeout("/api/dashboard/canteen-owner", { cache: "no-store" })
+        if (!res.ok) {
+          const payload = await res.json().catch(() => ({}))
+          throw new Error(String(payload?.error || "Gagal memuat data kantin"))
+        }
         const data = await res.json()
         if (!active) return
         if (data.owner) setOwner(data.owner)
         setCanteen(data.canteen || null)
         if (Array.isArray(data.products)) setProducts(data.products)
         if (Array.isArray(data.orders)) setOrders(data.orders)
-      } catch {
-        // Keep fallback empty state when API is unavailable.
+      } catch (error) {
+        if (!active) return
+        if (error instanceof Error && error.name === "AbortError") {
+          setLoadError("Waktu memuat data terlalu lama. Silakan coba lagi.")
+        } else {
+          setLoadError(error instanceof Error ? error.message : "Gagal memuat data kantin")
+        }
+      } finally {
+        if (active) {
+          setIsLoading(false)
+        }
       }
     }
 
@@ -68,11 +95,20 @@ export default function CanteenOwnerDashboard() {
   }, [])
 
   // Calculate statistics
-  const todayOrders = orders.filter(o => o.createdAt.startsWith("2025-12-30"))
+  const todayKey = new Date().toISOString().slice(0, 10)
+  const todayOrders = orders.filter((o) => String(o.createdAt || "").startsWith(todayKey))
   const pendingOrders = orders.filter(o => o.status === "PENDING")
   const preparingOrders = orders.filter(o => o.status === "PREPARING")
   const readyOrders = orders.filter(o => o.status === "READY")
   const completedOrders = orders.filter(o => o.status === "COMPLETED")
+  const historicalOrders = useMemo(
+    () =>
+      orders
+        .filter((order) => order.status === "COMPLETED" || order.status === "CANCELLED")
+        .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+        .slice(0, 6),
+    [orders],
+  )
   
   const todayRevenue = todayOrders
     .filter(o => o.status === "COMPLETED")
@@ -81,9 +117,30 @@ export default function CanteenOwnerDashboard() {
 
   const availableProducts = products.filter(p => p.isAvailable).length
 
-  const handleUpdateOrderStatus = (orderId: string, newStatus: OrderStatus) => {
-    setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o))
-    toast.success(`Order berhasil di-update ke ${getStatusLabel(newStatus)}`)
+  const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+    if (updatingOrderId) return
+
+    setUpdatingOrderId(orderId)
+    try {
+      const res = await fetch(`/api/canteen-owner/orders/${orderId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      })
+
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}))
+        throw new Error(String(payload?.error || "Gagal update status order"))
+      }
+
+      const data = await res.json()
+      setOrders((prev) => prev.map((item) => (item.id === orderId ? data.order : item)))
+      toast.success(`Order berhasil di-update ke ${getStatusLabel(newStatus)}`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal update status order")
+    } finally {
+      setUpdatingOrderId(null)
+    }
   }
 
   const getStatusColor = (status: OrderStatus) => {
@@ -108,13 +165,33 @@ export default function CanteenOwnerDashboard() {
     }
   }
 
-  if (!owner) {
+  if (isLoading) {
     return <RouteLoading />
+  }
+
+  if (!owner) {
+    return (
+      <DashboardLayout role="CANTEEN_OWNER" userName="Pemilik Kantin" userAvatar="/placeholder-user.jpg">
+        <div className="max-w-2xl mx-auto px-1">
+          <GlassCard className="p-6 border border-amber-200 bg-amber-50">
+            <h1 className="text-lg font-semibold text-amber-800">Data Kantin Belum Siap</h1>
+            <p className="text-sm text-amber-700 mt-2">
+              {loadError || "Akun ini belum terhubung ke data kantin. Hubungi admin untuk melengkapi data owner dan kantin."}
+            </p>
+          </GlassCard>
+        </div>
+      </DashboardLayout>
+    )
   }
 
   return (
     <DashboardLayout role="CANTEEN_OWNER" userName={owner.name} userAvatar={owner.avatar}>
       <div className="max-w-4xl mx-auto space-y-6 px-1">
+        {loadError ? (
+          <GlassCard className="p-3 border border-amber-200 bg-amber-50 text-amber-700 text-sm">
+            {loadError}
+          </GlassCard>
+        ) : null}
         {/* Header */}
         <div className="pb-2">
           <h1 className="text-xl font-bold text-slate-800">Selamat Datang, {owner.name}</h1>
@@ -141,7 +218,7 @@ export default function CanteenOwnerDashboard() {
                 </div>
               </div>
             </div>
-            <Link href="/canteen-owner/settings" className="text-sm text-blue-500">
+            <Link href="/canteen-owner/profile" className="text-sm text-blue-500">
               Pengaturan
             </Link>
           </div>
@@ -287,12 +364,14 @@ export default function CanteenOwnerDashboard() {
                     <>
                       <button
                         onClick={() => handleUpdateOrderStatus(order.id, "PREPARING")}
+                        disabled={updatingOrderId === order.id}
                         className="flex-1 py-2 px-4 bg-blue-500 text-white rounded-xl text-sm font-medium hover:bg-blue-600 transition-colors"
                       >
-                        Proses Order
+                        {updatingOrderId === order.id ? "Menyimpan..." : "Proses Order"}
                       </button>
                       <button
                         onClick={() => handleUpdateOrderStatus(order.id, "CANCELLED")}
+                        disabled={updatingOrderId === order.id}
                         className="py-2 px-4 bg-red-100 text-red-600 rounded-xl text-sm font-medium hover:bg-red-200 transition-colors"
                       >
                         <XCircle className="w-4 h-4" />
@@ -302,17 +381,19 @@ export default function CanteenOwnerDashboard() {
                   {order.status === "PREPARING" && (
                     <button
                       onClick={() => handleUpdateOrderStatus(order.id, "READY")}
+                      disabled={updatingOrderId === order.id}
                       className="flex-1 py-2 px-4 bg-green-500 text-white rounded-xl text-sm font-medium hover:bg-green-600 transition-colors"
                     >
-                      Siap Diambil
+                      {updatingOrderId === order.id ? "Menyimpan..." : "Siap Diambil"}
                     </button>
                   )}
                   {order.status === "READY" && (
                     <button
                       onClick={() => handleUpdateOrderStatus(order.id, "COMPLETED")}
+                      disabled={updatingOrderId === order.id}
                       className="flex-1 py-2 px-4 bg-slate-800 text-white rounded-xl text-sm font-medium hover:bg-slate-900 transition-colors"
                     >
-                      Selesai
+                      {updatingOrderId === order.id ? "Menyimpan..." : "Selesai"}
                     </button>
                   )}
                 </div>
@@ -320,11 +401,50 @@ export default function CanteenOwnerDashboard() {
             ))}
 
             {pendingOrders.length === 0 && preparingOrders.length === 0 && readyOrders.length === 0 && (
-              <GlassCard>
-                <EmptySkeleton rows={3} className="py-4" />
+              <GlassCard className="p-5 text-center">
+                <p className="font-medium text-slate-700">Belum ada order aktif</p>
+                <p className="text-sm text-slate-500 mt-1">Order baru akan muncul di sini saat siswa mulai memesan.</p>
               </GlassCard>
             )}
           </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-slate-800">Riwayat Pesanan</h2>
+            <Link href="/canteen-owner/orders" className="text-sm text-blue-500 flex items-center gap-1">
+              Lihat Semua <ChevronRight className="w-4 h-4" />
+            </Link>
+          </div>
+
+          {historicalOrders.length === 0 ? (
+            <GlassCard className="p-5 text-center">
+              <p className="font-medium text-slate-700">Belum ada riwayat pesanan</p>
+              <p className="text-sm text-slate-500 mt-1">Order selesai atau dibatalkan akan muncul di bagian ini.</p>
+            </GlassCard>
+          ) : (
+            <div className="space-y-3">
+              {historicalOrders.map((order) => (
+                <GlassCard key={`${order.id}-history`} className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-800">#{order.id.toUpperCase()}</p>
+                      <p className="text-sm text-slate-500 mt-1 break-words">
+                        {order.customerName} • {new Date(order.createdAt).toLocaleString("id-ID")}
+                      </p>
+                    </div>
+                    <span className={cn("px-2 py-0.5 rounded-full text-xs font-medium border", getStatusColor(order.status))}>
+                      {getStatusLabel(order.status)}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between">
+                    <p className="text-xs text-slate-500">Status pesanan terkini: {getStatusLabel(order.status)}</p>
+                    <p className="font-semibold text-slate-800">Rp {order.totalAmount.toLocaleString()}</p>
+                  </div>
+                </GlassCard>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </DashboardLayout>

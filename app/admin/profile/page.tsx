@@ -8,6 +8,7 @@ import { GlassCard } from "@/components/molecules/glass-card"
 import { GlassModal } from "@/components/molecules/glass-modal"
 import { GlassButton } from "@/components/atoms/glass-button"
 import { GlassInput } from "@/components/atoms/glass-input"
+import { ImageUploadModal } from "@/components/molecules/image-upload"
 import {
   User,
   Mail,
@@ -17,8 +18,6 @@ import {
   Briefcase,
   School,
   Clock,
-  CheckCircle,
-  AlertCircle,
   Camera,
   Save,
 } from "lucide-react"
@@ -33,7 +32,6 @@ export default function AdminProfile() {
   })
   const [isLoading, setIsLoading] = useState(true)
   const [stats, setStats] = useState({ studentsCount: 0, employeesCount: 0, classesCount: 0 })
-  const [recentActivities, setRecentActivities] = useState<Array<{ action: string; time: string; status: string }>>([])
   const [showEditModal, setShowEditModal] = useState(false)
   const [showAvatarModal, setShowAvatarModal] = useState(false)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
@@ -41,6 +39,7 @@ export default function AdminProfile() {
   const [editForm, setEditForm] = useState({
     name: admin.name,
     email: admin.email,
+    password: "",
   })
 
   useEffect(() => {
@@ -56,10 +55,9 @@ export default function AdminProfile() {
         if (!active) return
         if (data.admin) {
           setAdmin(data.admin)
-          setEditForm({ name: data.admin.name || "", email: data.admin.email || "" })
+          setEditForm({ name: data.admin.name || "", email: data.admin.email || "", password: "" })
         }
         if (data.stats) setStats(data.stats)
-        if (Array.isArray(data.recentActivities)) setRecentActivities(data.recentActivities)
       } catch {
         // Keep fallback values.
       } finally {
@@ -80,6 +78,7 @@ export default function AdminProfile() {
   const handleSaveProfile = async () => {
     if (!admin.id || isSavingProfile) return
     setIsSavingProfile(true)
+    const password = editForm.password.trim()
     try {
       const res = await fetch("/api/admin/profile", {
         method: "PATCH",
@@ -89,50 +88,56 @@ export default function AdminProfile() {
           name: editForm.name,
           email: editForm.email,
           avatar: admin.avatar,
+          ...(password ? { password } : {}),
         }),
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}))
+        throw new Error(String(payload?.error || "Gagal memperbarui profil"))
+      }
 
       setAdmin((prev) => ({ ...prev, name: editForm.name, email: editForm.email }))
       setShowEditModal(false)
       toast.success("Profil berhasil diperbarui")
-    } catch {
-      toast.error("Gagal memperbarui profil")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal memperbarui profil")
     } finally {
       setIsSavingProfile(false)
     }
   }
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file && admin.id) {
-      setIsSavingAvatar(true)
-      const reader = new FileReader()
-      reader.onload = async (e) => {
-        const result = e.target?.result as string
-        try {
-          const res = await fetch("/api/admin/profile", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              id: admin.id,
-              name: admin.name,
-              email: admin.email,
-              avatar: result,
-            }),
-          })
-          if (!res.ok) throw new Error()
+  const handleAvatarSave = async (imageData: string | null) => {
+    if (!imageData || !admin.id || isSavingAvatar) {
+      return
+    }
 
-          setAdmin((prev) => ({ ...prev, avatar: result }))
-          toast.success("Foto profil berhasil diperbarui")
-          setShowAvatarModal(false)
-        } catch {
-          toast.error("Gagal memperbarui foto profil")
-        } finally {
-          setIsSavingAvatar(false)
-        }
+    setIsSavingAvatar(true)
+    try {
+      const res = await fetch("/api/admin/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: admin.id,
+          name: admin.name,
+          email: admin.email,
+          avatar: imageData,
+        }),
+      })
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}))
+        throw new Error(String(payload?.error || "Gagal memperbarui foto profil"))
       }
-      reader.readAsDataURL(file)
+
+      const data = await res.json().catch(() => ({}))
+      const nextAvatar = String(data?.admin?.avatar || imageData)
+      setAdmin((prev) => ({ ...prev, avatar: nextAvatar }))
+      toast.success("Foto profil berhasil diperbarui")
+      setShowAvatarModal(false)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal memperbarui foto profil")
+      throw error
+    } finally {
+      setIsSavingAvatar(false)
     }
   }
 
@@ -213,40 +218,6 @@ export default function AdminProfile() {
                 <p className="font-medium text-slate-800 text-sm">Akses Admin Penuh</p>
               </div>
             </div>
-
-            <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-              <CheckCircle className="w-5 h-5 text-slate-400" />
-              <div>
-                <p className="text-xs text-slate-500">Status Akun</p>
-                <p className="font-medium text-emerald-600 text-sm">Aktif</p>
-              </div>
-            </div>
-          </div>
-        </GlassCard>
-
-        {/* Recent Activity */}
-        <GlassCard>
-          <h2 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">
-            <Clock className="w-5 h-5 text-slate-400" />
-            Aktivitas Terbaru
-          </h2>
-
-          <div className="space-y-2">
-            {recentActivities.map((activity, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  {activity.status === "success" ? (
-                    <CheckCircle className="w-5 h-5 text-emerald-500" />
-                  ) : (
-                    <AlertCircle className="w-5 h-5 text-amber-500" />
-                  )}
-                  <div>
-                    <p className="font-medium text-slate-800 text-sm">{activity.action}</p>
-                    <p className="text-xs text-slate-500">{activity.time}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
         </GlassCard>
 
@@ -254,7 +225,7 @@ export default function AdminProfile() {
         <GlassButton 
           className="w-full justify-center py-3"
           onClick={() => {
-            setEditForm({ name: admin.name, email: admin.email })
+            setEditForm({ name: admin.name, email: admin.email, password: "" })
             setShowEditModal(true)
           }}
         >
@@ -288,6 +259,16 @@ export default function AdminProfile() {
               placeholder="Masukkan email"
             />
           </div>
+          <div>
+            <label className="text-sm font-medium text-slate-700 mb-1.5 block">Password Baru (Opsional)</label>
+            <GlassInput
+              type="password"
+              value={editForm.password}
+              onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+              placeholder="Kosongkan jika tidak ingin ganti password"
+            />
+            <p className="text-xs text-slate-500 mt-1">Minimal 6 karakter</p>
+          </div>
         </div>
         
         <div className="flex gap-3 pt-4 mt-4 border-t border-slate-100">
@@ -309,34 +290,13 @@ export default function AdminProfile() {
         </div>
       </GlassModal>
 
-      {/* Avatar Upload Modal */}
-      <GlassModal
+      <ImageUploadModal
         isOpen={showAvatarModal}
         onClose={() => setShowAvatarModal(false)}
-        title="Upload Foto Profil"
-        size="sm"
-      >
-        <label className="block border-2 border-dashed border-slate-200 rounded-xl p-8 text-center cursor-pointer hover:border-blue-300 hover:bg-blue-50/50 transition-colors">
-          <input
-            type="file"
-            className="hidden"
-            accept="image/*"
-            onChange={handleAvatarChange}
-          />
-          <Camera className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <p className="text-sm text-slate-600 font-medium">Klik untuk pilih foto</p>
-          <p className="text-xs text-slate-400 mt-1">JPG, PNG (maks 5MB)</p>
-        </label>
-        
-        <GlassButton
-          variant="secondary"
-          onClick={() => setShowAvatarModal(false)}
-          disabled={isSavingAvatar}
-          className="w-full justify-center mt-4"
-        >
-          Batal
-        </GlassButton>
-      </GlassModal>
+        onSave={handleAvatarSave}
+        currentImage={admin.avatar}
+        title="Ganti Foto Profil"
+      />
     </DashboardLayout>
   )
 }

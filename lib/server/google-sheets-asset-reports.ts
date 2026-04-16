@@ -1,6 +1,7 @@
 import "server-only"
 
 import { google } from "googleapis"
+import { normalizeDriveMediaUrl } from "@/lib/google-drive"
 
 const ASSET_REPORTS_SHEET_PRIMARY_NAME = "asset_reports"
 const ASSET_REPORTS_SHEET_CANDIDATES = [
@@ -128,7 +129,7 @@ function normalizeAssetReportRow(row: string[]): DbAssetReport {
     assetName: row[3] || "",
     damageType: row[4] || "",
     description: row[5] || "",
-    imageUrl: normalizeMaybeString(row[13]),
+    imageUrl: normalizeDriveMediaUrl(row[13]),
     status: normalizeAssetReportStatus(row[6]),
     location: row[7] || "",
     createdAt: row[8] || new Date().toISOString(),
@@ -304,7 +305,7 @@ export async function createDbAssetReport(input: {
     assetName: String(input.assetName || input.assetId || "").trim(),
     damageType: String(input.damageType || "").trim(),
     description: String(input.description || "").trim(),
-    imageUrl: normalizeMaybeString(input.imageUrl),
+    imageUrl: normalizeDriveMediaUrl(input.imageUrl),
     status: input.status || "pending",
     location: String(input.location || "").trim(),
     createdAt: now,

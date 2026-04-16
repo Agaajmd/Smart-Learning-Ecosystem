@@ -6,6 +6,7 @@ import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassCard } from "@/components/molecules/glass-card"
 import { GlassModal } from "@/components/molecules/glass-modal"
 import { GlassButton } from "@/components/atoms/glass-button"
+import { FormattedChatText } from "@/components/molecules/formatted-chat-text"
 import type { Task, TaskSubmission } from "@/lib/data-model"
 import {
   FileText,
@@ -43,12 +44,64 @@ const isLikelyImageUrl = (value?: string) => {
   )
 }
 
+const isStoredMediaUrl = (value?: string) => {
+  if (!value) return false
+  const normalized = value.trim()
+  if (!normalized) return false
+  if (normalized.startsWith("data:")) return true
+  if (/^\/api\/media-assets\//i.test(normalized)) return true
+  if (/^https?:\/\/[^/]+\/api\/media-assets\//i.test(normalized)) return true
+  return /^https?:\/\/(?:drive\.google\.com|docs\.google\.com|drive\.usercontent\.google\.com|lh3\.googleusercontent\.com)\//i.test(normalized)
+}
+
 const toUrlList = (primary?: string, list?: string[]) => {
   const values = [primary, ...(Array.isArray(list) ? list : [])]
   const normalized = values
     .map((value) => String(value || "").trim())
     .filter(Boolean)
   return [...new Set(normalized)]
+}
+
+const splitMediaGroups = (attachmentUrls: string[], imageUrls: string[]) => {
+  const materialImageUrls = new Set<string>()
+  const materialFileUrls = new Set<string>()
+  const urlReferences = new Set<string>()
+  const imageReferences = new Set<string>()
+
+  for (const url of [...new Set(attachmentUrls)]) {
+    const isImage = isLikelyImageUrl(url)
+    const isStored = isStoredMediaUrl(url)
+
+    if (isStored) {
+      if (isImage) {
+        materialImageUrls.add(url)
+      } else {
+        materialFileUrls.add(url)
+      }
+      continue
+    }
+
+    if (isImage) {
+      imageReferences.add(url)
+    } else {
+      urlReferences.add(url)
+    }
+  }
+
+  for (const url of [...new Set(imageUrls)]) {
+    if (isStoredMediaUrl(url)) {
+      materialImageUrls.add(url)
+    } else {
+      imageReferences.add(url)
+    }
+  }
+
+  return {
+    materialImageUrls: [...materialImageUrls],
+    materialFileUrls: [...materialFileUrls],
+    imageReferenceUrls: [...imageReferences],
+    urlReferenceUrls: [...urlReferences],
+  }
 }
 
 const normalizeTaskMediaFields = (task: Task): Task => {
@@ -82,7 +135,7 @@ export default function StudentAssignmentsPage() {
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [submissionLinks, setSubmissionLinks] = useState<string[]>([""])
   const [submissionImageUrls, setSubmissionImageUrls] = useState<string[]>([""])
-  const [submissionFile, setSubmissionFile] = useState<File | null>(null)
+  const [submissionFiles, setSubmissionFiles] = useState<File[]>([])
   const [allTasks, setAllTasks] = useState<Task[]>([])
   const [allSubmissions, setAllSubmissions] = useState<TaskSubmission[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -173,13 +226,16 @@ export default function StudentAssignmentsPage() {
   const resetSubmissionForm = () => {
     setSubmissionLinks([""])
     setSubmissionImageUrls([""])
-    setSubmissionFile(null)
+    setSubmissionFiles([])
   }
 
-  const previewSelectedFile = () => {
-    if (!submissionFile) return
-    const previewUrl = URL.createObjectURL(submissionFile)
+  const previewSelectedFile = (file: File) => {
+    const previewUrl = URL.createObjectURL(file)
     window.open(previewUrl, "_blank", "noopener,noreferrer")
+  }
+
+  const removeSubmissionFile = (indexToRemove: number) => {
+    setSubmissionFiles((prev) => prev.filter((_, index) => index !== indexToRemove))
   }
 
   const handleSubmit = async () => {
@@ -187,7 +243,7 @@ export default function StudentAssignmentsPage() {
     const attachmentUrlsFromInput = toUrlList(undefined, submissionLinks)
     const imageUrlsFromInput = toUrlList(undefined, submissionImageUrls)
 
-    if (attachmentUrlsFromInput.length === 0 && imageUrlsFromInput.length === 0 && !submissionFile) {
+    if (attachmentUrlsFromInput.length === 0 && imageUrlsFromInput.length === 0 && submissionFiles.length === 0) {
       toast.error("Isi minimal satu: file, link, atau URL gambar")
       return
     }
@@ -200,18 +256,28 @@ export default function StudentAssignmentsPage() {
     let imageUrls = [...imageUrlsFromInput]
     let attachmentName: string | undefined = undefined
 
-    if (submissionFile) {
-      if (submissionFile.size > 10 * 1024 * 1024) {
-        toast.error("Ukuran file maksimal 10MB")
+    if (submissionFiles.length > 0) {
+      const fileOverLimit = submissionFiles.find((file) => file.size > 10 * 1024 * 1024)
+      if (fileOverLimit) {
+        toast.error(`Ukuran file ${fileOverLimit.name} maksimal 10MB`)
         return
       }
+
       try {
-        const encoded = await fileToDataUrl(submissionFile)
-        attachmentName = submissionFile.name
-        if (submissionFile.type.startsWith("image/")) {
-          imageUrls = [...new Set([...imageUrls, encoded])]
-        } else {
-          attachmentUrls = [...new Set([...attachmentUrls, encoded])]
+        for (const file of submissionFiles) {
+          const encoded = await fileToDataUrl(file)
+          if (file.type.startsWith("image/")) {
+            imageUrls = [...new Set([...imageUrls, encoded])]
+          } else {
+            attachmentUrls = [...new Set([...attachmentUrls, encoded])]
+            if (!attachmentName) {
+              attachmentName = file.name
+            }
+          }
+        }
+
+        if (!attachmentName && attachmentUrls.length > 1) {
+          attachmentName = `${attachmentUrls.length} lampiran`
         }
       } catch {
         toast.error("Gagal memproses file")
@@ -396,49 +462,96 @@ export default function StudentAssignmentsPage() {
 
               <div className="bg-slate-50 rounded-lg p-4">
                 <h4 className="text-sm font-medium text-slate-700 mb-2">Deskripsi</h4>
-                <p className="text-slate-600 text-sm leading-relaxed">{selectedTask.description}</p>
+                <FormattedChatText text={selectedTask.description} className="text-slate-600 text-sm" />
               </div>
 
-              {(toUrlList(selectedTask.attachmentUrl, selectedTask.attachmentUrls).length > 0 ||
-                toUrlList(selectedTask.imageUrl, selectedTask.imageUrls).length > 0) && (
-                <div className="bg-blue-50 rounded-lg p-3 space-y-2">
-                  <p className="text-sm font-medium text-blue-700">Lampiran dari Guru</p>
-                  {(() => {
-                    const teacherAttachmentUrls = toUrlList(selectedTask.attachmentUrl, selectedTask.attachmentUrls)
-                    const teacherImageUrls = toUrlList(selectedTask.imageUrl, selectedTask.imageUrls)
-                    const previewImageUrls =
-                      teacherImageUrls.length > 0
-                        ? teacherImageUrls
-                        : teacherAttachmentUrls.filter((url) => isLikelyImageUrl(url))
-                    if (previewImageUrls.length === 0) return null
-                    return (
+              {(() => {
+                const teacherAttachmentUrls = toUrlList(selectedTask.attachmentUrl, selectedTask.attachmentUrls)
+                const teacherImageUrls = toUrlList(selectedTask.imageUrl, selectedTask.imageUrls)
+                const teacherMedia = splitMediaGroups(teacherAttachmentUrls, teacherImageUrls)
+                const hasTeacherMedia =
+                  teacherMedia.urlReferenceUrls.length > 0 ||
+                  teacherMedia.imageReferenceUrls.length > 0 ||
+                  teacherMedia.materialImageUrls.length > 0 ||
+                  teacherMedia.materialFileUrls.length > 0
+
+                if (!hasTeacherMedia) return null
+
+                return (
+                  <div className="bg-blue-50 rounded-lg p-3 space-y-3">
+                    <p className="text-sm font-medium text-blue-700">Lampiran dari Guru</p>
+
+                    {teacherMedia.urlReferenceUrls.length > 0 ? (
                       <div className="space-y-2">
-                        {previewImageUrls.map((url, index) => (
-                          <div key={`${selectedTask.id}-preview-${index}`} className="rounded-xl border border-blue-200 bg-white p-2">
+                        <p className="text-xs font-medium text-blue-700/80">Referensi URL:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {teacherMedia.urlReferenceUrls.map((url, index) => (
+                            <a
+                              key={`${selectedTask.id}-url-reference-${index}`}
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white text-blue-600 text-xs font-medium hover:bg-blue-100"
+                            >
+                              <Link2 className="w-3.5 h-3.5" />
+                              {`Referensi ${index + 1}`}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {teacherMedia.imageReferenceUrls.length > 0 ? (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-blue-700/80">Referensi Gambar:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {teacherMedia.imageReferenceUrls.map((url, index) => (
+                            <a
+                              key={`${selectedTask.id}-image-reference-${index}`}
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white text-blue-600 text-xs font-medium hover:bg-blue-100"
+                            >
+                              <ImageIcon className="w-3.5 h-3.5" /> Referensi Gambar {index + 1}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {(teacherMedia.materialImageUrls.length > 0 || teacherMedia.materialFileUrls.length > 0) ? (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-blue-700/80">Gambar Materi</p>
+                        {teacherMedia.materialImageUrls.map((url, index) => (
+                          <div key={`${selectedTask.id}-material-image-${index}`} className="rounded-xl border border-blue-200 bg-white p-2">
                             <img
                               src={url}
-                              alt={`Lampiran gambar ${selectedTask.title} ${index + 1}`}
+                              alt={`Gambar materi ${selectedTask.title} ${index + 1}`}
                               className="w-full h-auto max-h-[420px] object-contain rounded-lg"
                             />
                           </div>
                         ))}
+                        {teacherMedia.materialFileUrls.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {teacherMedia.materialFileUrls.map((url, index) => (
+                              <a
+                                key={`${selectedTask.id}-material-file-${index}`}
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white text-blue-600 text-xs font-medium hover:bg-blue-100"
+                              >
+                                <FileText className="w-3.5 h-3.5" /> File Materi {index + 1}
+                              </a>
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
-                    )
-                  })()}
-                  <div className="flex flex-wrap gap-2">
-                    {toUrlList(selectedTask.attachmentUrl, selectedTask.attachmentUrls).map((url, index) => (
-                      <a key={`${selectedTask.id}-attachment-${index}`} href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white text-blue-600 text-xs font-medium hover:bg-blue-100">
-                        <Link2 className="w-3.5 h-3.5" /> {selectedTask.attachmentName && index === 0 ? selectedTask.attachmentName : `Buka Link Materi ${index + 1}`}
-                      </a>
-                    ))}
-                    {toUrlList(selectedTask.imageUrl, selectedTask.imageUrls).map((url, index) => (
-                      <a key={`${selectedTask.id}-image-${index}`} href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white text-blue-600 text-xs font-medium hover:bg-blue-100">
-                        <ImageIcon className="w-3.5 h-3.5" /> Buka Gambar Materi {index + 1}
-                      </a>
-                    ))}
+                    ) : null}
                   </div>
-                </div>
-              )}
+                )
+              })()}
 
               {(() => {
                 const submission = studentSubmissions.find((s) => s.taskId === selectedTask.id)
@@ -456,6 +569,7 @@ export default function StudentAssignmentsPage() {
                 if (submission?.status === "SUBMITTED") {
                   const submissionAttachmentUrls = toUrlList(submission.attachmentUrl, submission.attachmentUrls)
                   const submissionImageUrls = toUrlList(submission.imageUrl, submission.imageUrls)
+                  const submissionMedia = splitMediaGroups(submissionAttachmentUrls, submissionImageUrls)
                   return (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
                       <div className="flex items-center gap-2 text-blue-700">
@@ -463,18 +577,76 @@ export default function StudentAssignmentsPage() {
                         <span className="font-medium">Tugas Sudah Dikumpulkan</span>
                       </div>
                       <p className="text-sm text-blue-600">Dikumpulkan pada {formatDate(submission.submittedAt)}</p>
-                      <div className="flex flex-wrap gap-2">
-                        {submissionAttachmentUrls.map((url, index) => (
-                          <a key={`${submission.id}-attachment-${index}`} href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white text-blue-600 text-xs font-medium hover:bg-blue-100">
-                            <Link2 className="w-3.5 h-3.5" /> {submission.attachmentName && index === 0 ? submission.attachmentName : `Link Jawaban ${index + 1}`}
-                          </a>
-                        ))}
-                        {submissionImageUrls.map((url, index) => (
-                          <a key={`${submission.id}-image-${index}`} href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white text-blue-600 text-xs font-medium hover:bg-blue-100">
-                            <ImageIcon className="w-3.5 h-3.5" /> Gambar Jawaban {index + 1}
-                          </a>
-                        ))}
-                      </div>
+                      {submissionMedia.urlReferenceUrls.length > 0 ? (
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-blue-700/80">Referensi URL:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {submissionMedia.urlReferenceUrls.map((url, index) => (
+                              <a
+                                key={`${submission.id}-url-reference-${index}`}
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white text-blue-600 text-xs font-medium hover:bg-blue-100"
+                              >
+                                <Link2 className="w-3.5 h-3.5" />
+                                {`Referensi ${index + 1}`}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {submissionMedia.imageReferenceUrls.length > 0 ? (
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-blue-700/80">Referensi Gambar:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {submissionMedia.imageReferenceUrls.map((url, index) => (
+                              <a
+                                key={`${submission.id}-image-reference-${index}`}
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white text-blue-600 text-xs font-medium hover:bg-blue-100"
+                              >
+                                <ImageIcon className="w-3.5 h-3.5" /> Referensi Gambar {index + 1}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {(submissionMedia.materialImageUrls.length > 0 || submissionMedia.materialFileUrls.length > 0) ? (
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-blue-700/80">Gambar Materi</p>
+                          {submissionMedia.materialImageUrls.map((url, index) => (
+                            <a
+                              key={`${submission.id}-material-image-${index}`}
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white text-blue-600 text-xs font-medium hover:bg-blue-100 mr-2 mb-2"
+                            >
+                              <ImageIcon className="w-3.5 h-3.5" /> Gambar Materi {index + 1}
+                            </a>
+                          ))}
+                          {submissionMedia.materialFileUrls.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {submissionMedia.materialFileUrls.map((url, index) => (
+                                <a
+                                  key={`${submission.id}-material-file-${index}`}
+                                  href={url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white text-blue-600 text-xs font-medium hover:bg-blue-100"
+                                >
+                                  <FileText className="w-3.5 h-3.5" /> File Jawaban {index + 1}
+                                </a>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
                   )
                 }
@@ -502,13 +674,46 @@ export default function StudentAssignmentsPage() {
               <div>
                 <label className="text-sm font-medium text-slate-700 mb-1.5 block">Upload File Jawaban</label>
                 <label className="block border-2 border-dashed border-slate-200 rounded-xl p-4 cursor-pointer hover:border-blue-300 hover:bg-blue-50/50 transition-colors">
-                  <input type="file" className="hidden" onChange={(e) => setSubmissionFile(e.target.files?.[0] || null)} />
+                  <input
+                    type="file"
+                    className="hidden"
+                    multiple
+                    onChange={(e) => setSubmissionFiles(Array.from(e.target.files || []))}
+                  />
                   <div className="flex items-center gap-2 text-sm text-slate-600">
                     <Upload className="w-4 h-4 text-blue-500" />
-                    <span>{submissionFile ? submissionFile.name : "Pilih file PDF/DOC/Gambar"}</span>
+                    <span>
+                      {submissionFiles.length > 0
+                        ? `${submissionFiles.length} file dipilih`
+                        : "Pilih satu atau beberapa file PDF/DOC/Gambar"}
+                    </span>
                   </div>
                 </label>
-                {submissionFile && <button onClick={previewSelectedFile} className="mt-2 text-xs font-medium text-blue-600 hover:text-blue-700">Preview file</button>}
+                {submissionFiles.length > 0 ? (
+                  <div className="mt-2 space-y-2">
+                    {submissionFiles.map((file, index) => (
+                      <div key={`${file.name}-${file.size}-${index}`} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2">
+                        <p className="text-xs text-slate-700 truncate pr-3">{file.name}</p>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => previewSelectedFile(file)}
+                            className="text-xs font-medium text-blue-600 hover:text-blue-700"
+                          >
+                            Preview
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeSubmissionFile(index)}
+                            className="text-xs font-medium text-red-500 hover:text-red-600"
+                          >
+                            Hapus
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
 
               <div className="space-y-2">
@@ -594,7 +799,7 @@ export default function StudentAssignmentsPage() {
 
             <div className="flex gap-3 mt-4">
               <GlassButton variant="secondary" onClick={() => setShowUploadModal(false)} className="flex-1 justify-center">Batal</GlassButton>
-              <GlassButton onClick={handleSubmit} className="flex-1 justify-center" disabled={toUrlList(undefined, submissionLinks).length === 0 && toUrlList(undefined, submissionImageUrls).length === 0 && !submissionFile}>
+              <GlassButton onClick={handleSubmit} className="flex-1 justify-center" disabled={toUrlList(undefined, submissionLinks).length === 0 && toUrlList(undefined, submissionImageUrls).length === 0 && submissionFiles.length === 0}>
                 <Paperclip className="w-4 h-4 mr-1.5" /> Kirim
               </GlassButton>
             </div>

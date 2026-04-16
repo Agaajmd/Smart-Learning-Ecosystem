@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server"
-import { mkdir, writeFile } from "fs/promises"
-import path from "path"
-import crypto from "crypto"
 import {
   createDbAssetReport,
   getAllDbAssetReports,
 } from "@/lib/server/google-sheets-asset-reports"
+import { createDbMediaAssetFromDataUrl } from "@/lib/server/google-sheets-media-assets"
 import { getSessionUser } from "@/lib/server/session-user"
 import {
   getDbStudentReports,
@@ -13,16 +11,7 @@ import {
   type StudentReport,
 } from "@/lib/server/persistent-store"
 import { logAudit } from "@/lib/server/audit-log"
-
-const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
-
-const IMAGE_EXTENSION_BY_MIME: Record<string, string> = {
-  "image/jpeg": ".jpg",
-  "image/jpg": ".jpg",
-  "image/png": ".png",
-  "image/webp": ".webp",
-  "image/gif": ".gif",
-}
+import { normalizeDriveMediaUrl } from "@/lib/google-drive"
 
 function normalizeMaybeString(value: unknown) {
   const next = String(value || "").trim()
@@ -34,46 +23,16 @@ async function normalizeReportImageUrl(input: unknown, reportKey: string) {
   if (!source) return undefined
 
   if (!source.startsWith("data:")) {
-    return source
+    throw new Error("Gambar laporan harus diupload dari aplikasi.")
   }
 
-  const commaIndex = source.indexOf(",")
-  if (commaIndex < 0) {
-    throw new Error("Format gambar tidak valid")
-  }
+  const stored = await createDbMediaAssetFromDataUrl({
+    dataUrl: source,
+    ownerType: "asset_report",
+    ownerId: reportKey,
+  })
 
-  const header = source.slice(5, commaIndex)
-  if (!header.includes(";base64")) {
-    throw new Error("Format gambar harus base64")
-  }
-
-  const mimeType = header.split(";")[0]?.toLowerCase() || ""
-  const extension = IMAGE_EXTENSION_BY_MIME[mimeType]
-  if (!extension) {
-    throw new Error("Format gambar belum didukung")
-  }
-
-  const payload = source.slice(commaIndex + 1)
-  const buffer = Buffer.from(payload, "base64")
-  if (!buffer.length) {
-    throw new Error("Gambar tidak boleh kosong")
-  }
-  if (buffer.length > MAX_IMAGE_SIZE_BYTES) {
-    throw new Error("Ukuran gambar maksimal 5MB")
-  }
-
-  const safeKey = String(reportKey || "report")
-    .toLowerCase()
-    .replace(/[^a-z0-9-]/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-
-  const fileName = `${safeKey || "report"}-${Date.now()}-${crypto.randomUUID().slice(0, 8)}${extension}`
-  const uploadsDir = path.join(process.cwd(), "public", "uploads", "asset-reports")
-  await mkdir(uploadsDir, { recursive: true })
-  await writeFile(path.join(uploadsDir, fileName), buffer)
-
-  return `/uploads/asset-reports/${fileName}`
+  return stored.url
 }
 
 export async function GET(request: Request) {
@@ -106,7 +65,7 @@ export async function GET(request: Request) {
       assetName: report.assetName,
       damageType: report.damageType,
       description: report.description,
-      imageUrl: report.imageUrl,
+      imageUrl: normalizeDriveMediaUrl(report.imageUrl),
       status: report.status,
       createdAt: report.createdAt,
       location: report.location,
@@ -170,7 +129,7 @@ export async function POST(request: Request) {
       assetName: created.assetName,
       damageType: created.damageType,
       description: created.description,
-      imageUrl: created.imageUrl,
+      imageUrl: normalizeDriveMediaUrl(created.imageUrl),
       status: created.status,
       createdAt: created.createdAt,
       location: created.location,
@@ -186,7 +145,7 @@ export async function POST(request: Request) {
       assetName: String(body.assetName || assetId),
       damageType,
       description,
-      imageUrl,
+      imageUrl: normalizeDriveMediaUrl(imageUrl),
       status: "pending",
       createdAt: new Date().toISOString(),
       location,

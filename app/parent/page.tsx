@@ -31,6 +31,8 @@ export default function ParentDashboard() {
   const [parent, setParent] = useState<any>(null)
   const [children, setChildren] = useState<Student[]>([])
   const [selectedChild, setSelectedChild] = useState<Student | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [payments, setPayments] = useState<any[]>([])
   const [attendance, setAttendance] = useState<any[]>([])
   const [activityPoints, setActivityPoints] = useState<any[]>([])
@@ -40,25 +42,42 @@ export default function ParentDashboard() {
   useEffect(() => {
     let active = true
     const load = async () => {
+      setIsLoading(true)
+      setLoadError(null)
       try {
         const query = selectedChild?.id ? `?childId=${selectedChild.id}` : ""
         const res = await fetch(`/api/parent/child-overview${query}`, { cache: "no-store" })
-        if (!res.ok) return
+        if (!res.ok) {
+          const payload = await res.json().catch(() => ({}))
+          throw new Error(String(payload?.error || "Gagal memuat data parent"))
+        }
         const data = await res.json()
         if (!active) return
         if (data.parent) setParent(data.parent)
         if (Array.isArray(data.children) && data.children.length > 0) {
           setChildren(data.children)
-          const selected = data.selectedChild || data.children[0]
+          const selected =
+            data.selectedChild ||
+            data.children.find((item: Student) => item.id === selectedChild?.id) ||
+            data.children[0]
           setSelectedChild(selected)
+        } else {
+          setChildren([])
+          setSelectedChild(null)
         }
         if (Array.isArray(data.payments)) setPayments(data.payments)
         if (Array.isArray(data.attendance)) setAttendance(data.attendance)
         if (Array.isArray(data.activityPoints)) setActivityPoints(data.activityPoints)
         if (Array.isArray(data.grades)) setGrades(data.grades)
         setChildClass(data.childClass || null)
-      } catch {
-        setParent(null)
+      } catch (error) {
+        if (!active) return
+        setLoadError(error instanceof Error ? error.message : "Gagal memuat data parent")
+        setParent((prev: any) => prev || null)
+      } finally {
+        if (active) {
+          setIsLoading(false)
+        }
       }
     }
 
@@ -68,8 +87,46 @@ export default function ParentDashboard() {
     }
   }, [selectedChild?.id])
 
-  if (!parent || !selectedChild) {
+  if (isLoading) {
     return <RouteLoading />
+  }
+
+  if (!parent) {
+    return (
+      <DashboardLayout role="PARENT" userName="Orang Tua" userAvatar="/placeholder-user.jpg">
+        <div className="max-w-2xl mx-auto px-1">
+          <GlassCard className="p-6 border border-rose-200 bg-rose-50">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-rose-600 mt-0.5" />
+              <div>
+                <p className="font-semibold text-rose-700">Data parent belum tersedia</p>
+                <p className="text-sm text-rose-600 mt-1">{loadError || "Silakan cek relasi akun parent dengan siswa."}</p>
+              </div>
+            </div>
+          </GlassCard>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (!selectedChild) {
+    return (
+      <DashboardLayout role="PARENT" userName={parent.name} userAvatar={parent.avatar}>
+        <div className="max-w-2xl mx-auto px-1 space-y-4">
+          {loadError ? (
+            <GlassCard className="p-4 border border-amber-200 bg-amber-50 text-amber-700 text-sm">
+              {loadError}
+            </GlassCard>
+          ) : null}
+          <GlassCard className="p-6">
+            <h1 className="text-lg font-semibold text-slate-800">Belum Ada Data Anak</h1>
+            <p className="text-sm text-slate-600 mt-2">
+              Akun parent ini belum terhubung ke data siswa. Silakan hubungi wali kelas/admin untuk mengatur relasi parent-anak.
+            </p>
+          </GlassCard>
+        </div>
+      </DashboardLayout>
+    )
   }
 
   // Calculate statistics
@@ -92,6 +149,11 @@ export default function ParentDashboard() {
   return (
     <DashboardLayout role="PARENT" userName={parent.name} userAvatar={parent.avatar}>
       <div className="max-w-4xl mx-auto space-y-6 px-1">
+        {loadError ? (
+          <GlassCard className="p-3 border border-amber-200 bg-amber-50 text-amber-700 text-sm">
+            {loadError}
+          </GlassCard>
+        ) : null}
         {/* Header */}
         <div className="pb-2">
           <h1 className="text-xl font-bold text-slate-800">Selamat Datang, {parent.name}</h1>
@@ -115,7 +177,7 @@ export default function ParentDashboard() {
                 <img src={child.avatar} alt={child.name} className="w-10 h-10 rounded-full object-cover" />
                 <div className="text-left">
                   <p className="font-medium text-slate-800">{child.name}</p>
-                  <p className="text-xs text-slate-500">{child.id === selectedChild.id ? childClass?.name || child.classId : child.classId}</p>
+                  <p className="text-xs text-slate-500">{child.id === selectedChild?.id ? childClass?.name || child.classId : child.classId}</p>
                 </div>
               </button>
             ))}

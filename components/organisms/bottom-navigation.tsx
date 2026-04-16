@@ -24,19 +24,24 @@ import {
   Calendar,
   QrCode,
   Store,
-  GraduationCap,
-  X
+  SlidersHorizontal,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth"
 import { toast } from "sonner"
 import type { UserRole } from "@/lib/data-model"
 import { BottomSheet, BottomSheetHandle } from "@/components/organisms/bottom-sheet"
+import {
+  getPageFeatureKeyForPath,
+  isPageFeatureEnabled,
+  type PageFeatureStateMap,
+} from "@/lib/page-features"
 
 interface BottomNavigationProps {
   role: UserRole
   userName?: string
   userAvatar?: string
+  featureState?: PageFeatureStateMap
 }
 
 interface NavItem {
@@ -49,12 +54,19 @@ interface NavItem {
   disabledReason?: string
 }
 
-export const BottomNavigation = ({ role, userName, userAvatar }: BottomNavigationProps) => {
+export const BottomNavigation = ({ role, userName, userAvatar, featureState }: BottomNavigationProps) => {
   const pathname = usePathname()
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const { logout } = useAuth()
   const logoutTimerRef = useRef<number | null>(null)
+  const resolvedAvatar = (() => {
+    const next = String(userAvatar || "").trim()
+    if (!next || next === "null" || next === "undefined") {
+      return "/placeholder-user.jpg"
+    }
+    return next
+  })()
 
   // Main bottom nav items (limited to 4)
   const getNavItems = (): NavItem[] => {
@@ -85,6 +97,7 @@ export const BottomNavigation = ({ role, userName, userAvatar }: BottomNavigatio
           { href: "/super-admin", icon: Home, label: "Home", exact: true },
           { href: "/super-admin/finance", icon: BarChart3, label: "Keuangan" },
           { href: "/super-admin/staff", icon: Users, label: "Staff", activeMatch: "/super-admin/staff" },
+          { href: "/super-admin/features", icon: SlidersHorizontal, label: "Fitur" },
           { href: "/canteen", icon: Utensils, label: "Kantin" },
         ]
       case "PARENT":
@@ -144,6 +157,7 @@ export const BottomNavigation = ({ role, userName, userAvatar }: BottomNavigatio
           { href: "/super-admin", icon: Home, label: "Dashboard" },
           { href: "/super-admin/finance", icon: BarChart3, label: "Keuangan" },
           { href: "/super-admin/staff", icon: Users, label: "Manajemen Staff", activeMatch: "/super-admin/staff" },
+          { href: "/super-admin/features", icon: SlidersHorizontal, label: "Manajemen Fitur" },
           { href: "/canteen", icon: Utensils, label: "Kantin" },
         ]
       case "PARENT":
@@ -169,8 +183,24 @@ export const BottomNavigation = ({ role, userName, userAvatar }: BottomNavigatio
     }
   }
 
-  const navItems = useMemo(() => getNavItems(), [role])
-  const allMenuItems = useMemo(() => getAllMenuItems(), [role])
+  const applyFeatureStateToItems = useCallback(
+    (items: NavItem[]) =>
+      items.map((item) => {
+        const featureKey = getPageFeatureKeyForPath(item.href, role)
+        if (!featureKey) return item
+        if (isPageFeatureEnabled(featureKey, featureState)) return item
+
+        return {
+          ...item,
+          disabled: true,
+          disabledReason: "Fitur ini dinonaktifkan oleh Kepala Sekolah",
+        }
+      }),
+    [featureState, role],
+  )
+
+  const navItems = useMemo(() => applyFeatureStateToItems(getNavItems()), [applyFeatureStateToItems, role])
+  const allMenuItems = useMemo(() => applyFeatureStateToItems(getAllMenuItems()), [applyFeatureStateToItems, role])
 
   const normalizePath = useCallback((value: string) => {
     if (!value) return "/"
@@ -255,7 +285,7 @@ export const BottomNavigation = ({ role, userName, userAvatar }: BottomNavigatio
           >
             <div className="relative">
               <img
-                src={userAvatar || "/placeholder-user.jpg"}
+                src={resolvedAvatar}
                 alt={userName || "User"}
                 className="w-14 h-14 rounded-2xl object-cover ring-2 ring-white shadow-lg"
               />
@@ -342,6 +372,20 @@ export const BottomNavigation = ({ role, userName, userAvatar }: BottomNavigatio
             {navItems.slice(0, 4).map((item) => {
               const isActive = isRouteActive(item)
               const Icon = item.icon
+
+              if (item.disabled) {
+                return (
+                  <button
+                    key={item.href}
+                    type="button"
+                    onClick={() => toast.info(item.disabledReason || "Fitur sedang dinonaktifkan")}
+                    className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl text-slate-400 bg-slate-50 transition-all duration-300"
+                  >
+                    <Icon className="w-5 h-5" />
+                    <span className="text-[10px] font-medium">{item.label}</span>
+                  </button>
+                )
+              }
 
               return (
                 <Link

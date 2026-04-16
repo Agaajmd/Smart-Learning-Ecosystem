@@ -3,7 +3,11 @@ import "server-only"
 import { google } from "googleapis"
 import { compare, hash } from "bcryptjs"
 import type { UserRole } from "@/lib/data-model"
-import { uploadMediaDataUrlToDrive } from "@/lib/server/google-drive-media"
+import { getImageUrl, normalizeDriveMediaUrl } from "@/lib/google-drive"
+import {
+  createDbMediaAssetFromDataUrl,
+  extractMediaAssetIdFromReference,
+} from "@/lib/server/google-sheets-media-assets"
 
 const USERS_SHEET_NAME = "users"
 const USERS_COLUMNS = [
@@ -179,7 +183,7 @@ function normalizeUserRow(row: string[]): DbUser {
     name: row[1] || "",
     email: (row[2] || "").toLowerCase(),
     passwordHash: row[3] || "",
-    avatar: row[4] || "/placeholder-user.jpg",
+    avatar: getImageUrl(row[4], ""),
     role: normalizeUserRole(row[5]),
     classId: row[6] || undefined,
     phone: row[7] || undefined,
@@ -197,7 +201,7 @@ function toPublicUser(user: DbUser): PublicUser {
     email: user.email,
     phone: user.phone,
     subject: user.subject,
-    avatar: user.avatar,
+    avatar: normalizeDriveMediaUrl(user.avatar) || "",
     role: user.role,
   }
 }
@@ -319,7 +323,7 @@ export async function createDbUser(input: {
     name: input.name.trim(),
     email: input.email.trim().toLowerCase(),
     passwordHash,
-    avatar: input.avatar || "/placeholder-user.jpg",
+    avatar: normalizeDriveMediaUrl(input.avatar) || "",
     role: input.role,
     classId: input.classId,
     phone: input.phone,
@@ -421,17 +425,20 @@ export async function updateDbUserById(input: {
 
   const now = new Date().toISOString()
   const nextPasswordHash = input.password ? await hash(input.password, 10) : current.passwordHash
-  let nextAvatar = input.avatar || current.avatar
+  let nextAvatar = input.avatar != null ? normalizeDriveMediaUrl(input.avatar) || "" : current.avatar
   if (input.avatar && input.avatar.startsWith("data:")) {
-    const uploaded = await uploadMediaDataUrlToDrive({
+    const replaceAssetId = extractMediaAssetIdFromReference(current.avatar)
+    const uploaded = await createDbMediaAssetFromDataUrl({
       dataUrl: input.avatar,
-      fileName: `profile-${input.id}-${Date.now()}.png`,
-      ownerType: current.role,
+      ownerType: "profile_avatar",
       ownerId: input.id,
-      usage: "profile_avatar",
+      originalFileName: `profile-${input.id || current.id}-${Date.now()}.png`,
+      replaceAssetId,
     })
     nextAvatar = uploaded.url
   }
+
+  nextAvatar = normalizeDriveMediaUrl(nextAvatar) || ""
 
   const next: DbUser = {
     ...current,
@@ -574,6 +581,6 @@ export async function ensurePrincipalSeeded() {
     email: seedEmail,
     password: seedPassword,
     role: "SUPER_ADMIN",
-    avatar: "/placeholder-user.jpg",
+    avatar: "",
   })
 }

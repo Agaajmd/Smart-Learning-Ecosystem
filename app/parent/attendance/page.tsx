@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
 import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassCard } from "@/components/molecules/glass-card"
@@ -21,7 +21,7 @@ export default function ParentAttendancePage() {
   const [children, setChildren] = useState<Student[]>([])
   const [selectedChild, setSelectedChild] = useState<Student | null>(null)
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
-  const [selectedMonth, setSelectedMonth] = useState<string>("2025-12")
+  const [selectedMonth, setSelectedMonth] = useState<string>("")
   const [childClassName, setChildClassName] = useState("")
 
   useEffect(() => {
@@ -48,19 +48,40 @@ export default function ParentAttendancePage() {
     fetchOverview()
   }, [selectedChild?.id])
 
-  const filteredAttendance = attendance.filter(a => a.date.startsWith(selectedMonth))
+  const monthOptions = useMemo(() => {
+    const monthKeys = [...new Set(attendance.map((item) => String(item.date || "").slice(0, 7)).filter(Boolean))]
+      .sort((a, b) => b.localeCompare(a))
+
+    return monthKeys.map((value) => {
+      const [year, month] = value.split("-")
+      const asDate = new Date(Number(year), Math.max(0, Number(month) - 1), 1)
+      return {
+        value,
+        label: asDate.toLocaleDateString("id-ID", { month: "long", year: "numeric" }),
+      }
+    })
+  }, [attendance])
+
+  useEffect(() => {
+    if (monthOptions.length === 0) {
+      setSelectedMonth("")
+      return
+    }
+
+    if (!selectedMonth || !monthOptions.some((month) => month.value === selectedMonth)) {
+      setSelectedMonth(monthOptions[0].value)
+    }
+  }, [monthOptions, selectedMonth])
+
+  const filteredAttendance = selectedMonth
+    ? attendance.filter((item) => String(item.date || "").startsWith(selectedMonth))
+    : attendance
 
   const presentCount = filteredAttendance.filter(a => a.status === "PRESENT").length
   const sickCount = filteredAttendance.filter(a => a.status === "SICK").length
   const alphaCount = filteredAttendance.filter(a => a.status === "ALPHA").length
   const totalDays = filteredAttendance.length
   const attendancePercentage = totalDays > 0 ? Math.round((presentCount / totalDays) * 100) : 0
-
-  const months = [
-    { value: "2025-12", label: "Desember 2025" },
-    { value: "2025-11", label: "November 2025" },
-    { value: "2025-10", label: "Oktober 2025" },
-  ]
 
   if (!parent) {
     return <RouteLoading />
@@ -106,7 +127,7 @@ export default function ParentAttendancePage() {
 
         {/* Month Selector */}
         <div className="flex gap-2 overflow-x-auto pb-2">
-          {months.map(month => (
+          {monthOptions.map(month => (
             <button
               key={month.value}
               onClick={() => setSelectedMonth(month.value)}

@@ -8,7 +8,6 @@ import {
   ArrowLeft,
   Wallet,
   TrendingUp,
-  TrendingDown,
   ShoppingBag,
   Calendar,
   Download,
@@ -32,16 +31,55 @@ export default function CanteenOwnerFinancePage() {
   const [owner, setOwner] = useState<Owner | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
   const [selectedPeriod, setSelectedPeriod] = useState<string>("today")
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
+    let active = true
     const load = async () => {
-      const res = await fetch("/api/dashboard/canteen-owner", { cache: "no-store" })
-      if (!res.ok) return
-      const data = await res.json()
-      if (data.owner) setOwner(data.owner)
-      if (Array.isArray(data.orders)) setOrders(data.orders)
+      setIsLoading(true)
+      setLoadError(null)
+      try {
+        const ordersRes = await fetch("/api/canteen-owner/orders", { cache: "no-store" })
+        const ordersPayload = await ordersRes.json().catch(() => ({}))
+
+        if (ordersRes.ok) {
+          if (!active) return
+          if (ordersPayload.owner) setOwner(ordersPayload.owner)
+          if (Array.isArray(ordersPayload.orders)) setOrders(ordersPayload.orders)
+          return
+        }
+
+        const dashboardRes = await fetch("/api/dashboard/canteen-owner", { cache: "no-store" })
+        const dashboardPayload = await dashboardRes.json().catch(() => ({}))
+        if (!dashboardRes.ok) {
+          throw new Error(
+            String(
+              ordersPayload?.error ||
+                dashboardPayload?.error ||
+                "Gagal memuat data keuangan kantin",
+            ),
+          )
+        }
+
+        if (!active) return
+        if (dashboardPayload.owner) setOwner(dashboardPayload.owner)
+        if (Array.isArray(dashboardPayload.orders)) setOrders(dashboardPayload.orders)
+      } catch (error) {
+        if (!active) return
+        setLoadError(error instanceof Error ? error.message : "Gagal memuat data keuangan kantin")
+      } finally {
+        if (active) {
+          setIsLoading(false)
+        }
+      }
     }
+
     load().catch(() => {})
+
+    return () => {
+      active = false
+    }
   }, [])
 
   const completedOrders = useMemo(() => orders.filter((o) => o.status === "COMPLETED"), [orders])
@@ -107,8 +145,20 @@ export default function CanteenOwnerFinancePage() {
 
   const maxRevenue = Math.max(...dailyRevenue.map((d) => d.revenue), 1)
 
-  if (!owner) {
+  if (isLoading) {
     return <RouteLoading />
+  }
+
+  if (!owner) {
+    return (
+      <DashboardLayout role="CANTEEN_OWNER" userName="Pemilik Kantin" userAvatar="/placeholder-user.jpg">
+        <div className="max-w-2xl mx-auto px-1">
+          <GlassCard className="p-6 border border-amber-200 bg-amber-50 text-amber-700">
+            {loadError || "Data owner belum tersedia. Hubungi admin untuk sinkronisasi akun owner dengan kantin."}
+          </GlassCard>
+        </div>
+      </DashboardLayout>
+    )
   }
 
   const periods = [
@@ -120,6 +170,11 @@ export default function CanteenOwnerFinancePage() {
   return (
     <DashboardLayout role="CANTEEN_OWNER" userName={owner.name} userAvatar={owner.avatar}>
       <div className="max-w-4xl mx-auto space-y-6 px-1">
+        {loadError ? (
+          <GlassCard className="p-3 border border-amber-200 bg-amber-50 text-amber-700 text-sm">
+            {loadError}
+          </GlassCard>
+        ) : null}
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">

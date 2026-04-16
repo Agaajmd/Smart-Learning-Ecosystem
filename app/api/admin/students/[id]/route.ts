@@ -65,7 +65,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     name: nextName || (target?.name || userTarget?.name || ""),
     email: nextEmail || (target?.email || userTarget?.email || ""),
     phone: nextPhone != null ? nextPhone : (target?.phone || userTarget?.phone),
-    avatar: target?.avatar || userTarget?.avatar || "/placeholder-user.jpg",
+    avatar: target?.avatar || userTarget?.avatar || "",
     role: "STUDENT" as const,
     classId: normalizedNextClassId ?? (target?.classId || userTarget?.classId || ""),
     paymentStatus: target?.paymentStatus || "UNPAID" as const,

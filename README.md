@@ -55,8 +55,11 @@
 ### 🛒 Sistem Kantin
 - Katalog Produk dengan gambar
 - Keranjang belanja
-- Order history
+- Validasi stok & harga di server saat checkout
+- Manajemen status order (PENDING -> PREPARING -> READY -> COMPLETED/CANCELLED)
+- Restock otomatis saat order dibatalkan
 - Laporan keuangan pemilik kantin
+- CRUD produk pemilik kantin (tambah, edit, hapus, toggle ketersediaan)
 
 ---
 
@@ -83,13 +86,48 @@ cp .env.example .env.local
 npm run dev
 
 # 5. Buka browser
-open http://localhost:3000
+open https://your-domain.example
 ```
 
 ### Environment Variables
 
 - `GOOGLE_SHEETS_ID`: ID spreadsheet Google Sheets.
 - `GOOGLE_SERVICE_ACCOUNT_JSON`: service account JSON dalam format string satu baris (private key tetap pakai `\\n`).
+- `GOOGLE_DRIVE_FOLDER_ID`: ID folder Google Drive untuk semua upload media (avatar, foto kantin, foto produk, bukti transfer, lampiran, dll).
+- `GOOGLE_WORKSPACE_IMPERSONATE_USER` (opsional): email user Google Workspace untuk impersonation jika memakai domain-wide delegation.
+- `GOOGLE_DRIVE_OAUTH_CLIENT_ID` (opsional): OAuth client id untuk upload Drive via akun Google user.
+- `GOOGLE_DRIVE_OAUTH_CLIENT_SECRET` (opsional): OAuth client secret untuk upload Drive via akun Google user.
+- `GOOGLE_DRIVE_OAUTH_REFRESH_TOKEN` (opsional): refresh token akun Google user untuk upload Drive jika tidak memakai Shared Drive.
+- Jika memakai OAuth Drive, isi ketiga variabel OAuth di atas sekaligus (all-or-nothing).
+
+### Upload Media (Google Drive)
+
+- Semua upload gambar/file sekarang **langsung ke Google Drive**.
+- Aplikasi tidak lagi memakai fallback penyimpanan file ke local/path atau chunk data di sheet untuk upload baru.
+- OAuth untuk upload Drive memakai scope paling minim: `https://www.googleapis.com/auth/drive.file`.
+- API media hanya melayani file yang berada di folder `GOOGLE_DRIVE_FOLDER_ID`.
+- Pastikan service account punya akses `Editor` ke folder pada `GOOGLE_DRIVE_FOLDER_ID`.
+- Untuk menghindari error kuota service account, sangat disarankan menggunakan folder di **Shared Drive**.
+- Metadata upload lama di sheet `media_assets` tetap didukung untuk backward compatibility saat baca file lama.
+
+Jika muncul error:
+`Upload gagal: Service Account tidak punya kuota My Drive...`
+gunakan salah satu cara berikut:
+1. Pindahkan folder upload ke Shared Drive lalu update `GOOGLE_DRIVE_FOLDER_ID`.
+2. Atau isi `GOOGLE_DRIVE_OAUTH_CLIENT_ID`, `GOOGLE_DRIVE_OAUTH_CLIENT_SECRET`, `GOOGLE_DRIVE_OAUTH_REFRESH_TOKEN` agar upload memakai akun Google user (OAuth refresh token).
+
+### Generate OAuth Refresh Token (opsional)
+
+Jika ingin tetap pakai folder My Drive, buat refresh token lalu isi env OAuth:
+
+```bash
+npm run drive:oauth:token
+```
+
+Script akan:
+- Menampilkan URL consent OAuth.
+- Meminta kamu paste authorization code.
+- Menampilkan nilai `GOOGLE_DRIVE_OAUTH_CLIENT_ID`, `GOOGLE_DRIVE_OAUTH_CLIENT_SECRET`, `GOOGLE_DRIVE_OAUTH_REFRESH_TOKEN` untuk diisi ke `.env.local`.
 
 ### Build untuk Production
 
@@ -273,6 +311,8 @@ npm run type-check   # TypeScript check (jika ada)
 - [x] Sidebar navigation (desktop)
 - [x] Bottom sheet navigation (mobile)
 - [x] Sistem Kantin dengan produk
+- [x] CRUD produk pemilik kantin
+- [x] Integrasi order kantin owner end-to-end
 - [x] Jadwal untuk siswa, guru, dan orang tua
 - [x] User management (Admin)
 - [x] Financial reports (Super Admin, Canteen Owner)
@@ -286,7 +326,7 @@ npm run type-check   # TypeScript check (jika ada)
 ## 🚀 Future Improvements
 
 - [ ] Real-time notifications (WebSocket)
-- [ ] File upload (foto profil, dokumen)
+- [x] File upload (foto profil, dokumen) via Google Drive
 - [ ] Export data (PDF, Excel)
 - [ ] Email integration
 - [ ] Multi-language support (i18n)
@@ -300,7 +340,7 @@ npm run type-check   # TypeScript check (jika ada)
 
 ## 👨‍💻 Developer
 
-**Created with ❤️ by Aga**
+**Created with ❤️ by Agaaa**
 
 Project ini dibuat sebagai Smart Learning Ecosystem modern dengan fokus pada:
 - 🏗️ Clean architecture (Atomic Design)
@@ -322,10 +362,3 @@ MIT License - Feel free to use for educational purposes.
 **Happy Coding! 🎉**
 
 </div>
-Saya ingin kamu membaca perintah ini dengan benar karena saya igin hasil maksimal walaupun proses kamu lama. saya ingin kamu membaca selurh kode dan mengintegrasikan Api dengan benar pada beberpa page employee atau guru berikut dengan baik dan benar dan jangna lupakan bahwa modal form itu juga jangan dilewatkan :
-Kelola Tugas
-Jadwal
-Kelas
-Poin Keaktifan
-AI Rapor
-Kantin

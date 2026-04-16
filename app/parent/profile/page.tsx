@@ -7,6 +7,7 @@ import { GlassCard } from "@/components/molecules/glass-card"
 import { GlassModal } from "@/components/molecules/glass-modal"
 import { GlassButton } from "@/components/atoms/glass-button"
 import { GlassInput } from "@/components/atoms/glass-input"
+import { ImageUploadModal } from "@/components/molecules/image-upload"
 import { 
   ArrowLeft,
   Mail,
@@ -26,17 +27,14 @@ export default function ParentProfilePage() {
   const [showAvatarModal, setShowAvatarModal] = useState(false)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [isSavingAvatar, setIsSavingAvatar] = useState(false)
-  const [editForm, setEditForm] = useState({ name: "", email: "", phone: "" })
+  const [editForm, setEditForm] = useState({ name: "", email: "", phone: "", password: "" })
 
   useEffect(() => {
     const load = async () => {
       try {
-        const sessionRes = await fetch("/api/auth/session", { cache: "no-store" })
-        const session = sessionRes.ok ? await sessionRes.json() : null
-        const parentId = session?.user?.id || ""
         const [profileRes, childrenRes] = await Promise.all([
-          fetch(`/api/parent/profile${parentId ? `?parentId=${parentId}` : ""}`, { cache: "no-store" }),
-          fetch(`/api/parent/child-overview${parentId ? `?parentId=${parentId}` : ""}`, { cache: "no-store" }),
+          fetch("/api/parent/profile", { cache: "no-store" }),
+          fetch("/api/parent/child-overview", { cache: "no-store" }),
         ])
 
         if (!profileRes.ok || !childrenRes.ok) return
@@ -47,6 +45,7 @@ export default function ParentProfilePage() {
           name: profileData.parent?.name || "",
           email: profileData.parent?.email || "",
           phone: profileData.parent?.phone || "",
+          password: "",
         })
         setChildren(Array.isArray(childrenData.children) ? childrenData.children : [])
       } catch {
@@ -60,6 +59,7 @@ export default function ParentProfilePage() {
   const handleSaveProfile = async () => {
     if (!parent?.id || isSavingProfile) return
     setIsSavingProfile(true)
+    const password = editForm.password.trim()
     try {
       const res = await fetch("/api/parent/profile", {
         method: "PATCH",
@@ -70,56 +70,57 @@ export default function ParentProfilePage() {
           email: editForm.email,
           phone: editForm.phone,
           avatar: parent.avatar,
+          ...(password ? { password } : {}),
         }),
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}))
+        throw new Error(String(payload?.error || "Gagal memperbarui profil"))
+      }
 
       setParent((prev: any) => ({ ...prev, ...editForm }))
       setShowEditModal(false)
       toast.success("Profil berhasil diperbarui")
-    } catch {
-      toast.error("Gagal memperbarui profil")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal memperbarui profil")
     } finally {
       setIsSavingProfile(false)
     }
   }
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !parent?.id || isSavingAvatar) return
+  const handleAvatarSave = async (imageData: string | null) => {
+    if (!imageData || !parent?.id || isSavingAvatar) return
 
     setIsSavingAvatar(true)
-    const reader = new FileReader()
-    reader.onload = async (event) => {
-      const avatar = String(event.target?.result || "")
-      if (!avatar) {
-        setIsSavingAvatar(false)
-        return
+    try {
+      const res = await fetch("/api/parent/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: parent.id,
+          name: parent.name,
+          email: parent.email,
+          phone: parent.phone,
+          avatar: imageData,
+        }),
+      })
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}))
+        throw new Error(String(payload?.error || "Gagal memperbarui foto profil"))
       }
-      try {
-        const res = await fetch("/api/parent/profile", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id: parent.id,
-            name: parent.name,
-            email: parent.email,
-            phone: parent.phone,
-            avatar,
-          }),
-        })
-        if (!res.ok) throw new Error()
 
-        setParent((prev: any) => ({ ...prev, avatar }))
-        setShowAvatarModal(false)
-        toast.success("Foto profil berhasil diperbarui")
-      } catch {
-        toast.error("Gagal memperbarui foto profil")
-      } finally {
-        setIsSavingAvatar(false)
-      }
+      const data = await res.json().catch(() => ({}))
+      const nextAvatar = String(data?.parent?.avatar || imageData)
+
+      setParent((prev: any) => ({ ...prev, avatar: nextAvatar }))
+      setShowAvatarModal(false)
+      toast.success("Foto profil berhasil diperbarui")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal memperbarui foto profil")
+      throw error
+    } finally {
+      setIsSavingAvatar(false)
     }
-    reader.readAsDataURL(file)
   }
 
   if (!parent) {
@@ -216,7 +217,12 @@ export default function ParentProfilePage() {
         <GlassButton
           className="w-full py-3"
           onClick={() => {
-            setEditForm({ name: parent.name || "", email: parent.email || "", phone: parent.phone || "" })
+            setEditForm({
+              name: parent.name || "",
+              email: parent.email || "",
+              phone: parent.phone || "",
+              password: "",
+            })
             setShowEditModal(true)
           }}
         >
@@ -239,6 +245,11 @@ export default function ParentProfilePage() {
             <label className="block text-sm font-medium text-slate-700 mb-1">Nomor Telepon</label>
             <GlassInput value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Password Baru (Opsional)</label>
+            <GlassInput type="password" value={editForm.password} onChange={(e) => setEditForm({ ...editForm, password: e.target.value })} />
+            <p className="text-xs text-slate-500 mt-1">Minimal 6 karakter</p>
+          </div>
         </div>
 
         <div className="flex gap-3 mt-6">
@@ -251,18 +262,13 @@ export default function ParentProfilePage() {
         </div>
       </GlassModal>
 
-      <GlassModal isOpen={showAvatarModal} onClose={() => setShowAvatarModal(false)} title="Ganti Foto Profil" size="sm">
-        <label className="block border-2 border-dashed border-slate-200 rounded-xl p-8 text-center cursor-pointer hover:border-blue-300 hover:bg-blue-50/50 transition-colors">
-          <input type="file" className="hidden" accept="image/*" onChange={handleAvatarChange} />
-          <Camera className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <p className="text-sm text-slate-600 font-medium">Klik untuk pilih foto</p>
-          <p className="text-xs text-slate-400 mt-1">JPG, PNG (maks 5MB)</p>
-        </label>
-
-        <GlassButton variant="secondary" onClick={() => setShowAvatarModal(false)} className="w-full mt-4" disabled={isSavingAvatar}>
-          Batal
-        </GlassButton>
-      </GlassModal>
+      <ImageUploadModal
+        isOpen={showAvatarModal}
+        onClose={() => setShowAvatarModal(false)}
+        onSave={handleAvatarSave}
+        currentImage={parent.avatar}
+        title="Ganti Foto Profil"
+      />
     </DashboardLayout>
   )
 }

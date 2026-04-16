@@ -9,7 +9,6 @@ import type { Employee, Parent, StudentGrade, Student } from "@/lib/data-model"
 import { 
   ArrowLeft,
   BookOpen,
-  Award,
   TrendingUp,
 } from "lucide-react"
 import Link from "next/link"
@@ -22,6 +21,11 @@ export default function ParentGradesPage() {
   const [grades, setGrades] = useState<StudentGrade[]>([])
   const [teachers, setTeachers] = useState<Employee[]>([])
   const [childClassName, setChildClassName] = useState("")
+
+  const resolveAvatar = (value: unknown) => {
+    const next = String(value || "").trim()
+    return next || "/placeholder-user.jpg"
+  }
 
   useEffect(() => {
     const fetchOverview = async () => {
@@ -60,6 +64,16 @@ export default function ParentGradesPage() {
     if (score >= 80) return "text-blue-600 bg-blue-100"
     if (score >= 70) return "text-amber-600 bg-amber-100"
     return "text-red-600 bg-red-100"
+  }
+
+  const getOptionalGradeColor = (score?: number) => {
+    if (score == null || Number.isNaN(Number(score))) return "text-slate-500 bg-slate-100"
+    return getGradeColor(Number(score))
+  }
+
+  const formatOptionalScore = (score?: number) => {
+    if (score == null || Number.isNaN(Number(score))) return "-"
+    return String(Math.round(Number(score)))
   }
 
   const getAttitudeColor = (attitude: string) => {
@@ -103,7 +117,7 @@ export default function ParentGradesPage() {
                     : "border-slate-200 bg-white hover:border-slate-300"
                 )}
               >
-                <img src={child.avatar} alt={child.name} className="w-10 h-10 rounded-full object-cover" />
+                <img src={resolveAvatar(child.avatar)} alt={child.name} className="w-10 h-10 rounded-full object-cover" />
                 <div className="text-left">
                   <p className="font-medium text-slate-800">{child.name}</p>
                   <p className="text-xs text-slate-500">{child.id === selectedChild?.id ? childClassName : child.classId}</p>
@@ -111,6 +125,18 @@ export default function ParentGradesPage() {
               </button>
             ))}
           </div>
+        )}
+
+        {selectedChild && (
+          <GlassCard className="p-4">
+            <div className="flex items-center gap-3">
+              <img src={resolveAvatar(selectedChild.avatar)} alt={selectedChild.name} className="w-12 h-12 rounded-xl object-cover" />
+              <div>
+                <p className="font-semibold text-slate-800">{selectedChild.name}</p>
+                <p className="text-xs text-slate-500">{childClassName || selectedChild.classId || "-"}</p>
+              </div>
+            </div>
+          </GlassCard>
         )}
 
         {/* Summary Cards */}
@@ -149,6 +175,11 @@ export default function ParentGradesPage() {
                 <thead>
                   <tr className="border-b border-slate-200">
                     <th className="text-left py-3 px-2 text-sm font-semibold text-slate-600">Mata Pelajaran</th>
+                    <th className="text-center py-3 px-2 text-sm font-semibold text-slate-600">Tugas</th>
+                    <th className="text-center py-3 px-2 text-sm font-semibold text-slate-600">Praktik</th>
+                    <th className="text-center py-3 px-2 text-sm font-semibold text-slate-600">UTS</th>
+                    <th className="text-center py-3 px-2 text-sm font-semibold text-slate-600">UAS</th>
+                    <th className="text-center py-3 px-2 text-sm font-semibold text-slate-600">Ujian Sekolah</th>
                     <th className="text-center py-3 px-2 text-sm font-semibold text-slate-600">Pengetahuan</th>
                     <th className="text-center py-3 px-2 text-sm font-semibold text-slate-600">Keterampilan</th>
                     <th className="text-center py-3 px-2 text-sm font-semibold text-slate-600">Sikap</th>
@@ -157,13 +188,40 @@ export default function ParentGradesPage() {
                 <tbody>
                   {grades.map(grade => {
                     const teacher = teachers.find(e => e.id === grade.teacherId)
+                    const teacherName = String((grade as StudentGrade & { teacherName?: string }).teacherName || teacher?.name || "-")
                     return (
                       <tr key={grade.id} className="border-b border-slate-100 last:border-0">
                         <td className="py-4 px-2">
                           <div>
                             <p className="font-medium text-slate-800">{grade.subject}</p>
-                            <p className="text-xs text-slate-500">{teacher?.name}</p>
+                            <p className="text-xs text-slate-500">{teacherName}</p>
+                            <p className="text-xs text-slate-400">{grade.semester}</p>
                           </div>
+                        </td>
+                        <td className="py-4 px-2 text-center">
+                          <span className={cn("px-3 py-1 rounded-full text-sm font-bold", getOptionalGradeColor(grade.assignmentScore))}>
+                            {formatOptionalScore(grade.assignmentScore)}
+                          </span>
+                        </td>
+                        <td className="py-4 px-2 text-center">
+                          <span className={cn("px-3 py-1 rounded-full text-sm font-bold", getOptionalGradeColor(grade.practiceScore))}>
+                            {formatOptionalScore(grade.practiceScore)}
+                          </span>
+                        </td>
+                        <td className="py-4 px-2 text-center">
+                          <span className={cn("px-3 py-1 rounded-full text-sm font-bold", getOptionalGradeColor(grade.utsScore))}>
+                            {formatOptionalScore(grade.utsScore)}
+                          </span>
+                        </td>
+                        <td className="py-4 px-2 text-center">
+                          <span className={cn("px-3 py-1 rounded-full text-sm font-bold", getOptionalGradeColor(grade.uasScore))}>
+                            {formatOptionalScore(grade.uasScore)}
+                          </span>
+                        </td>
+                        <td className="py-4 px-2 text-center">
+                          <span className={cn("px-3 py-1 rounded-full text-sm font-bold", getOptionalGradeColor(grade.schoolExamScore))}>
+                            {formatOptionalScore(grade.schoolExamScore)}
+                          </span>
                         </td>
                         <td className="py-4 px-2 text-center">
                           <span className={cn("px-3 py-1 rounded-full text-sm font-bold", getGradeColor(grade.knowledge))}>

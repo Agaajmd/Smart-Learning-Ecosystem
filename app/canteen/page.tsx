@@ -16,6 +16,10 @@ import {
   Coffee,
   Cookie,
   Home,
+  Clock3,
+  ChefHat,
+  CheckCircle2,
+  CircleX,
 } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
@@ -28,6 +32,7 @@ type Product = {
   name: string
   description?: string
   price: number
+  stock: number
   category: "MAKANAN" | "MINUMAN" | "SNACK"
   image: string
   isAvailable: boolean
@@ -57,9 +62,78 @@ type OrderItem = {
   price: number
 }
 
+type OrderStatus = "PENDING" | "PREPARING" | "READY" | "COMPLETED" | "CANCELLED"
+
+type CanteenOrderHistory = {
+  id: string
+  canteenId: string
+  canteenName: string
+  customerId: string
+  customerRole: UserRole
+  customerName: string
+  items: OrderItem[]
+  totalAmount: number
+  status: OrderStatus
+  createdAt: string
+  completedAt?: string
+  notes?: string
+}
+
 interface CartItem extends OrderItem {
   canteenId: string
   canteenName: string
+}
+
+const getOrderStatusMeta = (status: OrderStatus) => {
+  switch (status) {
+    case "PENDING":
+      return {
+        label: "Menunggu",
+        className: "bg-amber-100 text-amber-700 border-amber-200",
+        icon: Clock3,
+      }
+    case "PREPARING":
+      return {
+        label: "Diproses",
+        className: "bg-blue-100 text-blue-700 border-blue-200",
+        icon: ChefHat,
+      }
+    case "READY":
+      return {
+        label: "Siap Diambil",
+        className: "bg-emerald-100 text-emerald-700 border-emerald-200",
+        icon: CheckCircle2,
+      }
+    case "COMPLETED":
+      return {
+        label: "Selesai",
+        className: "bg-slate-100 text-slate-700 border-slate-200",
+        icon: CheckCircle2,
+      }
+    case "CANCELLED":
+      return {
+        label: "Dibatalkan",
+        className: "bg-rose-100 text-rose-700 border-rose-200",
+        icon: CircleX,
+      }
+    default:
+      return {
+        label: status,
+        className: "bg-slate-100 text-slate-700 border-slate-200",
+        icon: Clock3,
+      }
+  }
+}
+
+const fetchWithTimeout = async (input: RequestInfo | URL, init?: RequestInit, timeoutMs = 12000) => {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal })
+  } finally {
+    clearTimeout(timeoutId)
+  }
 }
 
 export default function CanteenPage() {
@@ -74,14 +148,45 @@ export default function CanteenPage() {
 
   const [canteens, setCanteens] = useState<Canteen[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [orderHistory, setOrderHistory] = useState<CanteenOrderHistory[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [historyError, setHistoryError] = useState<string | null>(null)
+
+  const loadOrderHistory = useCallback(async () => {
+    try {
+      const res = await fetchWithTimeout("/api/canteen/orders", {
+        cache: "no-store",
+        credentials: "include",
+      })
+
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}))
+        if (res.status !== 401) {
+          setHistoryError(String(payload?.error || "Riwayat pesanan belum tersedia"))
+        }
+        return
+      }
+
+      const payload = await res.json().catch(() => ({}))
+      setOrderHistory(Array.isArray(payload.orders) ? payload.orders : [])
+      setHistoryError(null)
+    } catch {
+      setHistoryError("Riwayat pesanan belum dapat dimuat")
+    }
+  }, [])
 
   useEffect(() => {
     let active = true
     const load = async () => {
+      setIsLoading(true)
+      setLoadError(null)
       try {
-        const res = await fetch("/api/canteen/overview", { cache: "no-store" })
-        if (!res.ok) return
-        const data = await res.json()
+        const res = await fetchWithTimeout("/api/canteen/overview", { cache: "no-store" })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          throw new Error(String(data?.error || "Data kantin belum tersedia"))
+        }
         if (!active) return
         if (data?.viewer?.id && data?.viewer?.role) {
           setViewer({
@@ -93,8 +198,17 @@ export default function CanteenPage() {
         }
         if (Array.isArray(data.canteens)) setCanteens(data.canteens)
         if (Array.isArray(data.products)) setProducts(data.products)
-      } catch {
-        // Keep fallback empty data.
+      } catch (error) {
+        if (!active) return
+        if (error instanceof Error && error.name === "AbortError") {
+          setLoadError("Waktu memuat kantin terlalu lama. Coba muat ulang.")
+        } else {
+          setLoadError(error instanceof Error ? error.message : "Data kantin belum tersedia")
+        }
+      } finally {
+        if (active) {
+          setIsLoading(false)
+        }
       }
     }
 
@@ -103,6 +217,17 @@ export default function CanteenPage() {
       active = false
     }
   }, [])
+
+  useEffect(() => {
+    void loadOrderHistory()
+    const intervalId = window.setInterval(() => {
+      void loadOrderHistory()
+    }, 15000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [loadOrderHistory])
 
   const activeCanteens = useMemo(() => canteens.filter((canteen) => canteen.isOpen), [canteens])
   
@@ -132,12 +257,24 @@ export default function CanteenPage() {
     { value: "SNACK", label: "Snack", icon: Cookie },
   ]
 
-  const cartTotal = useMemo(() => cart.reduce((acc, item) => acc + item.price, 0), [cart])
+  const cartTotal = useMemo(
+    () => cart.reduce((acc, item) => acc + item.price * item.quantity, 0),
+    [cart],
+  )
   const cartItemCount = useMemo(() => cart.reduce((acc, item) => acc + item.quantity, 0), [cart])
 
   const addToCart = useCallback((product: Product) => {
     const canteen = canteens.find(c => c.id === product.canteenId)
     if (!canteen) return
+
+    const existingItem = cart.find((item) => item.productId === product.id)
+    const currentQty = existingItem?.quantity || 0
+    if (currentQty >= Number(product.stock || 0)) {
+      toast.error(`Stok ${product.name} tidak mencukupi`, {
+        description: `Maksimal ${product.stock} item per pesanan saat ini`,
+      })
+      return
+    }
 
     // Check if cart has items from different canteen
     if (cart.length > 0 && cart[0].canteenId !== product.canteenId) {
@@ -147,12 +284,11 @@ export default function CanteenPage() {
       return
     }
 
-    const existingItem = cart.find((item) => item.productId === product.id)
     if (existingItem) {
       setCart((prev) =>
         prev.map((item) =>
           item.productId === product.id
-            ? { ...item, quantity: item.quantity + 1, price: item.price + product.price }
+            ? { ...item, quantity: item.quantity + 1 }
             : item,
         ),
       )
@@ -170,21 +306,18 @@ export default function CanteenPage() {
       ])
     }
     toast.success(`${product.name} ditambahkan ke keranjang`)
-  }, [cart])
+  }, [cart, canteens])
 
   const removeFromCart = useCallback((productId: string) => {
     const existingItem = cart.find(item => item.productId === productId)
     if (existingItem && existingItem.quantity > 1) {
-      const product = products.find(p => p.id === productId)
-      if (product) {
-        setCart((prev) =>
-          prev.map((item) =>
-            item.productId === productId
-              ? { ...item, quantity: item.quantity - 1, price: item.price - product.price }
-              : item,
-          ),
-        )
-      }
+      setCart((prev) =>
+        prev.map((item) =>
+          item.productId === productId
+            ? { ...item, quantity: item.quantity - 1 }
+            : item,
+        ),
+      )
     } else {
       setCart((prev) => prev.filter((item) => item.productId !== productId))
     }
@@ -205,27 +338,66 @@ export default function CanteenPage() {
         return
       }
 
-      const res = await fetch("/api/canteen/orders", {
+      const staleItem = cart.find((item) => !products.find((product) => product.id === item.productId))
+      if (staleItem) {
+        toast.error("Ada produk yang sudah tidak tersedia. Muat ulang halaman lalu coba lagi.")
+        return
+      }
+
+      const res = await fetchWithTimeout("/api/canteen/orders", {
         method: "POST",
+        cache: "no-store",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           canteenId,
           items: cart.map((item) => ({
             productId: item.productId,
-            productName: item.productName,
             quantity: item.quantity,
-            price: item.price,
           })),
         }),
       })
 
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         throw new Error(data?.error || "Gagal membuat pesanan")
       }
 
+      const orderedQuantityByProduct = new Map<string, number>()
+      for (const item of cart) {
+        orderedQuantityByProduct.set(
+          item.productId,
+          (orderedQuantityByProduct.get(item.productId) || 0) + Number(item.quantity || 0),
+        )
+      }
+
+      setProducts((prev) =>
+        prev.map((product) => {
+          const orderedQuantity = orderedQuantityByProduct.get(product.id)
+          if (!orderedQuantity) return product
+
+          const nextStock = Math.max(0, Number(product.stock || 0) - orderedQuantity)
+          return {
+            ...product,
+            stock: nextStock,
+            isAvailable: nextStock > 0 ? product.isAvailable : false,
+          }
+        }),
+      )
+
+      if (data?.order?.id) {
+        const fallbackCanteenName = canteens.find((item) => item.id === canteenId)?.name || "Kantin"
+        const nextOrder: CanteenOrderHistory = {
+          ...data.order,
+          canteenName: String(data.order.canteenName || fallbackCanteenName),
+        }
+        setOrderHistory((prev) => [nextOrder, ...prev.filter((item) => item.id !== nextOrder.id)])
+      } else {
+        void loadOrderHistory()
+      }
+
       toast.success("Pesanan berhasil dibuat!", {
-        description: "Pesanan Anda sedang diproses oleh kantin",
+        description: "Pembayaran dipotong dari saldo dompet. Cek status pada Riwayat Pesanan.",
       })
       clearCart()
     } catch (error) {
@@ -234,7 +406,7 @@ export default function CanteenPage() {
     } finally {
       setIsCheckingOut(false)
     }
-  }, [cart, clearCart])
+  }, [cart, canteens, clearCart, loadOrderHistory, products])
 
   const quantityByProduct = useMemo(() => {
     return cart.reduce<Record<string, number>>((acc, item) => {
@@ -247,6 +419,8 @@ export default function CanteenPage() {
     (productId: string) => quantityByProduct[productId] ?? 0,
     [quantityByProduct],
   )
+
+  const latestOrderHistory = useMemo(() => orderHistory.slice(0, 8), [orderHistory])
 
   const pageContent = (
     <>
@@ -317,6 +491,12 @@ export default function CanteenPage() {
           })}
         </div>
 
+        {loadError ? (
+          <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+            {loadError}
+          </div>
+        ) : null}
+
         {/* Canteen List */}
         <section className="mb-8">
           <div className="flex items-center justify-between mb-4">
@@ -331,33 +511,44 @@ export default function CanteenPage() {
             )}
           </div>
           <div className="flex gap-4 overflow-x-auto pb-2">
-            {activeCanteens.map(canteen => (
-              <button
-                key={canteen.id}
-                onClick={() => setSelectedCanteen(selectedCanteen?.id === canteen.id ? null : canteen)}
-                className={cn(
-                  "min-w-[200px] bg-white rounded-2xl p-4 border-2 transition-all text-left",
-                  selectedCanteen?.id === canteen.id 
-                    ? "border-orange-500 shadow-lg shadow-orange-500/20" 
-                    : "border-transparent shadow hover:shadow-md"
-                )}
-              >
-                <img 
-                  src={canteen.image} 
-                  alt={canteen.name}
-                  className="w-full h-24 object-cover rounded-xl mb-3"
-                />
-                <h3 className="font-semibold text-slate-800 truncate">{canteen.name}</h3>
-                <div className="flex items-center gap-2 mt-1">
-                  <div className="flex items-center gap-1 text-amber-500">
-                    <Star className="w-4 h-4 fill-current" />
-                    <span className="text-sm font-medium">{canteen.rating}</span>
+            {isLoading ? (
+              <div className="min-w-full bg-white rounded-2xl p-2">
+                <EmptySkeleton rows={2} className="py-4" />
+              </div>
+            ) : activeCanteens.length === 0 ? (
+              <div className="min-w-full rounded-2xl border border-slate-200 bg-white p-5 text-center">
+                <p className="font-medium text-slate-700">Belum ada kantin yang buka</p>
+                <p className="text-sm text-slate-500 mt-1">Silakan cek lagi nanti atau hubungi admin kantin.</p>
+              </div>
+            ) : (
+              activeCanteens.map(canteen => (
+                <button
+                  key={canteen.id}
+                  onClick={() => setSelectedCanteen(selectedCanteen?.id === canteen.id ? null : canteen)}
+                  className={cn(
+                    "min-w-[200px] bg-white rounded-2xl p-4 border-2 transition-all text-left",
+                    selectedCanteen?.id === canteen.id 
+                      ? "border-orange-500 shadow-lg shadow-orange-500/20" 
+                      : "border-transparent shadow hover:shadow-md"
+                  )}
+                >
+                  <img 
+                    src={canteen.image} 
+                    alt={canteen.name}
+                    className="w-full h-24 object-cover rounded-xl mb-3"
+                  />
+                  <h3 className="font-semibold text-slate-800 truncate">{canteen.name}</h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="flex items-center gap-1 text-amber-500">
+                      <Star className="w-4 h-4 fill-current" />
+                      <span className="text-sm font-medium">{canteen.rating}</span>
+                    </div>
+                    <span className="text-xs text-slate-400">•</span>
+                    <span className="text-xs text-slate-500">{canteen.totalOrders}+ order</span>
                   </div>
-                  <span className="text-xs text-slate-400">•</span>
-                  <span className="text-xs text-slate-500">{canteen.totalOrders}+ order</span>
-                </div>
-              </button>
-            ))}
+                </button>
+              ))
+            )}
           </div>
         </section>
 
@@ -366,71 +557,152 @@ export default function CanteenPage() {
           <h2 className="text-lg font-bold text-slate-800 mb-4">
             {selectedCanteen ? `Menu ${selectedCanteen.name}` : "Semua Menu"}
           </h2>
-          <div className="grid grid-cols-2 gap-4">
-            {filteredProducts.map(product => {
-              const canteen = canteens.find(c => c.id === product.canteenId)
-              const quantity = getItemQuantity(product.id)
-              
-              return (
-                <div 
-                  key={product.id}
-                  className="bg-white rounded-2xl shadow hover:shadow-md transition-shadow overflow-hidden"
-                >
-                  <div className="relative">
-                    <img 
-                      src={product.image} 
-                      alt={product.name}
-                      className="w-full h-28 object-cover"
-                    />
-                    <span className={cn(
-                      "absolute top-2 left-2 px-2 py-0.5 rounded-full text-xs font-medium",
-                      product.category === "MAKANAN" ? "bg-orange-100 text-orange-700" :
-                      product.category === "MINUMAN" ? "bg-blue-100 text-blue-700" :
-                      "bg-purple-100 text-purple-700"
-                    )}>
-                      {product.category}
-                    </span>
-                  </div>
-                  <div className="p-3">
-                    <p className="text-xs text-slate-500 truncate">{canteen?.name}</p>
-                    <h3 className="font-semibold text-slate-800 text-sm truncate mt-0.5">{product.name}</h3>
-                    <p className="text-xs text-slate-500 line-clamp-1 mt-1">{product.description}</p>
-                    <div className="flex items-center justify-between mt-3">
-                      <p className="font-bold text-orange-600">Rp {product.price.toLocaleString()}</p>
-                      {quantity > 0 ? (
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => removeFromCart(product.id)}
-                            className="p-1 rounded-full bg-orange-100 text-orange-600 hover:bg-orange-200"
-                          >
-                            <Minus className="w-4 h-4" />
-                          </button>
-                          <span className="font-bold text-slate-800 w-6 text-center">{quantity}</span>
+          {isLoading ? (
+            <div className="bg-white rounded-2xl p-2">
+              <EmptySkeleton rows={4} className="py-4" />
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="bg-white rounded-2xl p-5 border border-slate-200 text-center">
+              <p className="font-medium text-slate-700">Menu belum tersedia</p>
+              <p className="text-sm text-slate-500 mt-1">
+                {selectedCanteen
+                  ? `Belum ada menu aktif di ${selectedCanteen.name}.`
+                  : "Tidak ada menu aktif yang cocok dengan filter saat ini."}
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              {filteredProducts.map(product => {
+                const canteen = canteens.find(c => c.id === product.canteenId)
+                const quantity = getItemQuantity(product.id)
+
+                return (
+                  <div 
+                    key={product.id}
+                    className="bg-white rounded-2xl shadow hover:shadow-md transition-shadow overflow-hidden"
+                  >
+                    <div className="relative">
+                      <img 
+                        src={product.image} 
+                        alt={product.name}
+                        className="w-full h-28 object-cover"
+                      />
+                      <span className={cn(
+                        "absolute top-2 left-2 px-2 py-0.5 rounded-full text-xs font-medium",
+                        product.category === "MAKANAN" ? "bg-orange-100 text-orange-700" :
+                        product.category === "MINUMAN" ? "bg-blue-100 text-blue-700" :
+                        "bg-purple-100 text-purple-700"
+                      )}>
+                        {product.category}
+                      </span>
+                    </div>
+                    <div className="p-3">
+                      <p className="text-xs text-slate-500 truncate">{canteen?.name}</p>
+                      <h3 className="font-semibold text-slate-800 text-sm truncate mt-0.5">{product.name}</h3>
+                      <p className="text-xs text-slate-500 line-clamp-1 mt-1">{product.description}</p>
+                      <div className="flex items-center justify-between mt-3">
+                        <p className="font-bold text-orange-600">Rp {product.price.toLocaleString()}</p>
+                        {quantity > 0 ? (
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => removeFromCart(product.id)}
+                              className="p-1 rounded-full bg-orange-100 text-orange-600 hover:bg-orange-200"
+                            >
+                              <Minus className="w-4 h-4" />
+                            </button>
+                            <span className="font-bold text-slate-800 w-6 text-center">{quantity}</span>
+                            <button
+                              onClick={() => addToCart(product)}
+                              disabled={quantity >= product.stock}
+                              className="p-1 rounded-full bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
                           <button
                             onClick={() => addToCart(product)}
-                            className="p-1 rounded-full bg-orange-500 text-white hover:bg-orange-600"
+                            disabled={product.stock <= 0}
+                            className="p-1.5 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <Plus className="w-4 h-4" />
                           </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => addToCart(product)}
-                          className="p-1.5 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </button>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
+          )}
+        </section>
+
+        <section className="mt-10">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-slate-800">Riwayat Pesanan</h2>
+            <span className="text-xs text-slate-500">Status pesanan terkini</span>
           </div>
 
-          {filteredProducts.length === 0 && (
-            <div className="bg-white rounded-2xl p-2">
-              <EmptySkeleton rows={4} className="py-4" />
+          {historyError ? (
+            <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
+              {historyError}
+            </div>
+          ) : null}
+
+          {latestOrderHistory.length === 0 ? (
+            <div className="bg-white rounded-2xl p-5 border border-slate-200 text-center">
+              <p className="font-medium text-slate-700">Belum ada riwayat pesanan</p>
+              <p className="text-sm text-slate-500 mt-1">Riwayat akan tampil setelah Anda melakukan checkout pesanan.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {latestOrderHistory.map((order) => {
+                const statusMeta = getOrderStatusMeta(order.status)
+                const StatusIcon = statusMeta.icon
+                const orderItems = Array.isArray(order.items) ? order.items : []
+                const orderDateLabel = new Date(order.createdAt).toLocaleDateString("id-ID", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                })
+
+                return (
+                  <div key={order.id} className="bg-white rounded-2xl border border-slate-200 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-slate-800">Pesanan {orderDateLabel}</p>
+                        <p className="text-xs text-slate-500 mt-1 break-words">
+                          {order.canteenName} • {new Date(order.createdAt).toLocaleString("id-ID")}
+                        </p>
+                      </div>
+                      <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border", statusMeta.className)}>
+                        <StatusIcon className="w-3.5 h-3.5" />
+                        {statusMeta.label}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 space-y-1">
+                      {orderItems.slice(0, 2).map((item, index) => (
+                        <p key={`${order.id}-item-${index}`} className="text-sm text-slate-600">
+                          {item.quantity}x {item.productName}
+                        </p>
+                      ))}
+                      {orderItems.length > 2 ? (
+                        <p className="text-xs text-slate-500">+{orderItems.length - 2} item lainnya</p>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <p className="text-xs text-slate-500">
+                        {order.completedAt
+                          ? `Selesai: ${new Date(order.completedAt).toLocaleString("id-ID")}`
+                          : `Status terakhir: ${statusMeta.label}`}
+                      </p>
+                      <p className="text-sm font-semibold text-slate-800">Rp {Number(order.totalAmount || 0).toLocaleString()}</p>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
         </section>
@@ -494,7 +766,8 @@ export default function CanteenPage() {
                         />
                         <div className="flex-1 min-w-0">
                           <h4 className="font-medium text-slate-800 truncate">{item.productName}</h4>
-                          <p className="text-orange-600 font-bold">Rp {item.price.toLocaleString()}</p>
+                          <p className="text-orange-600 font-bold">Rp {(item.price * item.quantity).toLocaleString()}</p>
+                          <p className="text-xs text-slate-500">@ Rp {item.price.toLocaleString()}</p>
                         </div>
                         <div className="flex items-center gap-2">
                           <button
@@ -506,7 +779,8 @@ export default function CanteenPage() {
                           <span className="font-bold text-slate-800 w-6 text-center">{item.quantity}</span>
                           <button
                             onClick={() => product && addToCart(product)}
-                            className="p-1.5 rounded-full bg-orange-500 text-white hover:bg-orange-600"
+                            disabled={!product || item.quantity >= product.stock}
+                            className="p-1.5 rounded-full bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <Plus className="w-4 h-4" />
                           </button>

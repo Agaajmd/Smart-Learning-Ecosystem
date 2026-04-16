@@ -27,6 +27,7 @@ type WalletTopupItem = {
   status: WalletTopupStatus
   requestedAt: string
   proofReference?: string
+  proofUrl?: string
   adminNote?: string
 }
 
@@ -92,8 +93,9 @@ export function SchoolWalletTopup({ role, renderTrigger }: SchoolWalletTopupProp
 
   const [amount, setAmount] = useState("")
   const [method, setMethod] = useState<WalletTopupMethod>("QRIS")
-  const [proofReference, setProofReference] = useState("")
-  const [proofUrl, setProofUrl] = useState("")
+  const [proofFileName, setProofFileName] = useState("")
+  const [proofDataUrl, setProofDataUrl] = useState("")
+  const [proofMimeType, setProofMimeType] = useState("")
 
   const selectedMethod = useMemo(
     () => methods.find((item) => item.code === method) || null,
@@ -139,10 +141,44 @@ export function SchoolWalletTopup({ role, renderTrigger }: SchoolWalletTopupProp
 
   if (!isEnabled) return null
 
+  const isProofImage = proofMimeType.startsWith("image/") && proofDataUrl.startsWith("data:")
+
+  const handleProofFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) {
+      setProofFileName("")
+      setProofDataUrl("")
+      setProofMimeType("")
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const encoded = String(reader.result || "")
+      if (!encoded) {
+        toast.error("Gagal membaca file bukti transfer")
+        return
+      }
+
+      setProofFileName(file.name)
+      setProofMimeType(file.type || "")
+      setProofDataUrl(encoded)
+    }
+    reader.onerror = () => {
+      toast.error("Gagal membaca file bukti transfer")
+    }
+    reader.readAsDataURL(file)
+  }
+
   const handleSubmit = async () => {
     const numericAmount = Number(amount)
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
       toast.error("Nominal topup tidak valid")
+      return
+    }
+
+    if (!proofDataUrl) {
+      toast.error("Bukti transfer wajib diupload")
       return
     }
 
@@ -154,8 +190,7 @@ export function SchoolWalletTopup({ role, renderTrigger }: SchoolWalletTopupProp
         body: JSON.stringify({
           amount: numericAmount,
           method,
-          proofReference: proofReference.trim() || undefined,
-          proofUrl: proofUrl.trim() || undefined,
+          proofUrl: proofDataUrl,
         }),
       })
 
@@ -166,8 +201,9 @@ export function SchoolWalletTopup({ role, renderTrigger }: SchoolWalletTopupProp
 
       toast.success("Permintaan topup berhasil dikirim")
       setAmount("")
-      setProofReference("")
-      setProofUrl("")
+      setProofFileName("")
+      setProofDataUrl("")
+      setProofMimeType("")
       await loadTopups()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Gagal mengirim permintaan topup")
@@ -252,26 +288,52 @@ export function SchoolWalletTopup({ role, renderTrigger }: SchoolWalletTopupProp
               </div>
             ) : null}
 
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-600">Referensi Bukti (opsional)</label>
-              <GlassInput
-                placeholder="Contoh: TRX-12345 / jam transfer"
-                value={proofReference}
-                onChange={(e) => setProofReference(e.target.value)}
-              />
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-slate-600">Upload Bukti Transfer *</label>
+              <label className="block rounded-xl border-2 border-dashed border-slate-200 bg-white px-4 py-5 text-center cursor-pointer hover:border-blue-300 hover:bg-blue-50/40 transition-colors">
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+                  onChange={handleProofFileChange}
+                />
+                <p className="text-sm font-medium text-slate-700">Klik untuk upload file/foto bukti transfer</p>
+                <p className="text-xs text-slate-500 mt-1">Format umum didukung, maksimal 10MB.</p>
+              </label>
+
+              {proofDataUrl ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+                  <p className="text-xs text-slate-600">
+                    File dipilih: <span className="font-medium">{proofFileName || "Bukti transfer"}</span>
+                  </p>
+                  {isProofImage ? (
+                    <img
+                      src={proofDataUrl}
+                      alt="Preview bukti transfer"
+                      className="max-h-56 w-full object-contain rounded-lg border border-slate-200 bg-white"
+                    />
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProofFileName("")
+                      setProofDataUrl("")
+                      setProofMimeType("")
+                    }}
+                    className="text-xs font-medium text-rose-600 hover:text-rose-700"
+                  >
+                    Hapus file
+                  </button>
+                </div>
+              ) : null}
             </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-600">URL Bukti Transfer (opsional)</label>
-              <GlassInput
-                type="url"
-                placeholder="https://..."
-                value={proofUrl}
-                onChange={(e) => setProofUrl(e.target.value)}
-              />
-            </div>
-
-            <GlassButton type="button" className="w-full" onClick={() => void handleSubmit()} disabled={isSubmitting}>
+            <GlassButton
+              type="button"
+              className="w-full"
+              onClick={() => void handleSubmit()}
+              disabled={isSubmitting || !proofDataUrl}
+            >
               {isSubmitting ? "Mengirim..." : "Kirim Permintaan Topup"}
             </GlassButton>
           </div>
@@ -296,6 +358,16 @@ export function SchoolWalletTopup({ role, renderTrigger }: SchoolWalletTopupProp
                       </span>
                     </div>
                     <p className="text-slate-500 mt-1">{new Date(item.requestedAt).toLocaleString("id-ID")}</p>
+                    {item.proofUrl ? (
+                      <a
+                        href={item.proofUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex mt-1 text-blue-600 hover:text-blue-700"
+                      >
+                        Lihat bukti transfer
+                      </a>
+                    ) : null}
                     {item.adminNote ? <p className="text-slate-600 mt-1">Catatan admin: {item.adminNote}</p> : null}
                   </div>
                 )

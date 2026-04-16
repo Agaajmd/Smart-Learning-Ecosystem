@@ -13,6 +13,7 @@ import {
 } from "@/lib/server/persistent-store"
 import { createClassIdResolver } from "@/lib/server/class-id-resolver"
 import { logAudit } from "@/lib/server/audit-log"
+import { normalizeDriveMediaUrl } from "@/lib/google-drive"
 
 const ALLOWED_STATUSES = new Set(["pending", "in_progress", "resolved"])
 
@@ -46,7 +47,7 @@ export async function GET() {
       assetName: report.assetName,
       damageType: report.damageType,
       description: report.description,
-      imageUrl: report.imageUrl,
+      imageUrl: normalizeDriveMediaUrl(report.imageUrl),
       status: report.status,
       createdAt: report.createdAt,
       location: report.location,
@@ -119,7 +120,7 @@ export async function PATCH(request: Request) {
       assetName: updated.assetName,
       damageType: updated.damageType,
       description: updated.description,
-      imageUrl: updated.imageUrl,
+      imageUrl: normalizeDriveMediaUrl(updated.imageUrl),
       status: updated.status,
       createdAt: updated.createdAt,
       location: updated.location,

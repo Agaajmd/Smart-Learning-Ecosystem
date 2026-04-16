@@ -17,6 +17,16 @@ const dayMap = [
   { id: "Friday", label: "Jumat" },
 ]
 
+const dayAliases: Record<string, string[]> = {
+  monday: ["monday", "senin", "mon", "sen"],
+  tuesday: ["tuesday", "selasa", "tue", "sel"],
+  wednesday: ["wednesday", "rabu", "wed", "rab"],
+  thursday: ["thursday", "kamis", "thu", "kam"],
+  friday: ["friday", "jumat", "jum'at", "fri", "jum"],
+}
+
+const normalizeDay = (value: unknown) => String(value || "").trim().toLowerCase()
+
 export default function ParentSchedule() {
   const [parent, setParent] = useState<any>(null)
   const [children, setChildren] = useState<Student[]>([])
@@ -46,7 +56,12 @@ export default function ParentSchedule() {
   }, [selectedChild?.id])
 
   const daySchedule = useMemo(
-    () => schedules.filter((s) => s.day === selectedDay).sort((a, b) => a.startTime.localeCompare(b.startTime)),
+    () => {
+      const selectedAliases = new Set(dayAliases[normalizeDay(selectedDay)] || [])
+      return schedules
+        .filter((schedule) => selectedAliases.has(normalizeDay(schedule.day)))
+        .sort((a, b) => a.startTime.localeCompare(b.startTime))
+    },
     [schedules, selectedDay],
   )
 

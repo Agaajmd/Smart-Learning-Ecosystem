@@ -2,17 +2,20 @@ import { NextResponse } from "next/server"
 import { getAllDbUsers } from "@/lib/server/google-sheets-auth"
 import { getAllDbClasses } from "@/lib/server/google-sheets-classes"
 import { getAllDbSchedules } from "@/lib/server/google-sheets-schedules"
-import { getAllDbCanteens } from "@/lib/server/google-sheets-canteens"
 import { getAllDbAssetReports } from "@/lib/server/google-sheets-asset-reports"
+import { getAllDbOrdersFromSheet, migrateDbOrdersToSheet } from "@/lib/server/google-sheets-orders"
+import { getAllDbProductsFromSheet } from "@/lib/server/google-sheets-products"
 import { getSessionUser } from "@/lib/server/session-user"
 import { createClassIdResolver } from "@/lib/server/class-id-resolver"
 import { assignStudentSeatsToClasses } from "@/lib/server/class-seat-layout"
+import { resolveParentChildIds } from "@/lib/server/parent-child-links"
+import { normalizeDriveMediaUrl } from "@/lib/google-drive"
+import { resolveCanteenOwnerContext } from "@/lib/server/canteen-owner-context"
 import {
   getDbActivityPoints,
   getDbAdmins,
   getDbAttendance,
   getDbAuditLogs,
-  getDbCanteenOwners,
   getDbCanteens,
   getDbClasses,
   getDbGrades,
@@ -25,7 +28,8 @@ import {
   getDbSuperAdmins,
   getDbTasks,
   getDbTeachers,
-  setDbCanteens,
+  setDbOrders,
+  setDbProducts,
 } from "@/lib/server/persistent-store"
 
 const normalizeId = (value: unknown) => String(value || "").trim().toLowerCase()
@@ -393,8 +397,87 @@ export async function GET(request: Request, { params }: { params: Promise<{ role
       }
 
       const parentMap = getDbParents().find((item) => item.id === parent.id || item.email === parent.email) || null
-      const children = getDbStudents().filter((student) => parentMap?.childrenIds.includes(student.id))
-      const selectedChild = children[0] || null
+      type ParentStudentRow = {
+        id: string
+        name: string
+        email: string
+        phone?: string
+        avatar: string
+        role: "STUDENT"
+        classId: string
+        paymentStatus: "PAID" | "UNPAID" | "PARTIAL"
+        behaviorScore: number
+        attendance: "PRESENT" | "SICK" | "ALPHA"
+        seatRow: number
+        seatCol: number
+        coins: number
+        streak: number
+        level: number
+        xp: number
+      }
+      const studentsFromUsers: ParentStudentRow[] = users
+        .filter((user) => user.role === "STUDENT" && user.isActive)
+        .map((user) => ({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          avatar: user.avatar,
+          role: "STUDENT" as const,
+          classId: resolveClassId(user.classId),
+          paymentStatus: "UNPAID" as const,
+          behaviorScore: 0,
+          attendance: "PRESENT" as const,
+          seatRow: 0,
+          seatCol: 0,
+          coins: 0,
+          streak: 0,
+          level: 0,
+          xp: 0,
+        }))
+      const studentsFromStore: ParentStudentRow[] = getDbStudents().map((student) => ({
+        id: student.id,
+        name: student.name,
+        email: student.email,
+        phone: student.phone,
+        avatar: student.avatar,
+        role: "STUDENT",
+        classId: resolveClassId(student.classId),
+        paymentStatus: student.paymentStatus || "UNPAID",
+        behaviorScore: Number(student.behaviorScore || 0),
+        attendance: student.attendance || "PRESENT",
+        seatRow: Number(student.seatRow || 0),
+        seatCol: Number(student.seatCol || 0),
+        coins: Number(student.coins || 0),
+        streak: Number(student.streak || 0),
+        level: Number(student.level || 0),
+        xp: Number(student.xp || 0),
+      }))
+      const studentMap = new Map<string, ParentStudentRow>()
+      for (const student of studentsFromStore) {
+        studentMap.set(student.id, {
+          ...student,
+          classId: resolveClassId(student.classId),
+        })
+      }
+      for (const student of studentsFromUsers) {
+        studentMap.set(student.id, {
+          ...(studentMap.get(student.id) || student),
+          ...student,
+          classId: student.classId || studentMap.get(student.id)?.classId || "",
+        })
+      }
+      const mergedStudents = [...studentMap.values()]
+      const childIds = resolveParentChildIds({
+        students: mergedStudents,
+        classes: classesFromSheet,
+        parentChildrenIds: parentMap?.childrenIds,
+        parentRelationField: parent.classId,
+        resolveClassId,
+      })
+      const children = mergedStudents.filter((student) => childIds.includes(student.id))
+      const selectedChildId = url.searchParams.get("childId") || children[0]?.id
+      const selectedChild = children.find((item) => item.id === selectedChildId) || children[0] || null
 
       const data = selectedChild
         ? {
@@ -402,7 +485,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ role
             attendance: getDbAttendance().filter((item) => item.studentId === selectedChild.id),
             activityPoints: getDbActivityPoints().filter((item) => item.studentId === selectedChild.id),
             grades: getDbGrades().filter((item) => item.studentId === selectedChild.id),
-            childClass: getDbClasses().find((item) => item.id === selectedChild.classId) || null,
+            childClass:
+              classesFromSheet.find((item) => item.id === resolveClassId(selectedChild.classId)) ||
+              getDbClasses().find((item) => item.id === resolveClassId(selectedChild.classId)) ||
+              null,
           }
         : {
             payments: getDbPayments().filter(() => false),
@@ -416,24 +502,74 @@ export async function GET(request: Request, { params }: { params: Promise<{ role
     }
 
     case "canteen-owner": {
-      const canteensFromSheet = await getAllDbCanteens()
-      setDbCanteens(canteensFromSheet)
-      const ownerId = url.searchParams.get("ownerId")
-      const ownerUser = ownerId
-        ? users.find((user) => user.id === ownerId && user.role === "CANTEEN_OWNER" && user.isActive) || null
-        : sessionUser?.role === "CANTEEN_OWNER"
-          ? users.find((user) => user.id === sessionUser.id && user.role === "CANTEEN_OWNER" && user.isActive) || null
-        : users.find((user) => user.role === "CANTEEN_OWNER" && user.isActive) || null
-      if (!ownerUser) {
+      if (!sessionUser) {
+        return NextResponse.json({ error: "Session tidak ditemukan" }, { status: 401 })
+      }
+
+      const isAdminViewer = sessionUser.role === "ADMIN" || sessionUser.role === "SUPER_ADMIN"
+      const isOwnerViewer = sessionUser.role === "CANTEEN_OWNER"
+      if (!isAdminViewer && !isOwnerViewer) {
+        return NextResponse.json({ error: "Akses ditolak" }, { status: 403 })
+      }
+
+      const requestedOwnerId = String(url.searchParams.get("ownerId") || "").trim()
+      const ownerContext = await resolveCanteenOwnerContext({
+        ownerId: isOwnerViewer ? sessionUser.id : requestedOwnerId || undefined,
+      })
+      if (!ownerContext) {
         return NextResponse.json({ error: "Pemilik kantin tidak ditemukan" }, { status: 404 })
       }
-      const owner = getDbCanteenOwners().find((item) => item.id === ownerUser.id || item.email === ownerUser.email) || null
-      if (!owner) {
-        return NextResponse.json({ error: "Data kantin owner tidak ditemukan" }, { status: 404 })
+
+      const owner = ownerContext.owner
+      const canteen = ownerContext.canteen
+      const canteenId = owner.canteenId
+      let productsSource = getDbProducts()
+      try {
+        const fromSheet = await getAllDbProductsFromSheet()
+        if (fromSheet.length > 0) {
+          productsSource = fromSheet
+          setDbProducts(fromSheet)
+        }
+      } catch {
+        productsSource = getDbProducts()
       }
-      const canteen = canteensFromSheet.find((item) => item.ownerId === ownerUser.id) || getDbCanteens().find((item) => item.id === owner.canteenId) || null
-      const products = getDbProducts().filter((item) => item.canteenId === owner.canteenId)
-      const orders = getDbOrders().filter((item) => item.canteenId === owner.canteenId)
+
+      const products = canteenId
+        ? productsSource
+            .filter((item) => item.canteenId === canteenId)
+            .map((item) => ({
+              ...item,
+              image: normalizeDriveMediaUrl(item.image) || "",
+            }))
+        : []
+
+      let ordersSource = [] as Awaited<ReturnType<typeof getAllDbOrdersFromSheet>>
+      try {
+        const fromSheet = await getAllDbOrdersFromSheet()
+        if (fromSheet.length > 0) {
+          ordersSource = fromSheet
+          setDbOrders(fromSheet)
+        } else {
+          const localOrders = getDbOrders()
+          if (localOrders.length > 0) {
+            const migratedOrders = await migrateDbOrdersToSheet(localOrders)
+            ordersSource = migratedOrders
+            setDbOrders(migratedOrders)
+          } else {
+            ordersSource = fromSheet
+            setDbOrders(fromSheet)
+          }
+        }
+      } catch {
+        ordersSource = []
+      }
+
+      const orders = canteenId
+        ? ordersSource
+            .filter((item) => item.canteenId === canteenId)
+            .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+        : []
+
       return NextResponse.json({ owner, canteen, products, orders })
     }
 

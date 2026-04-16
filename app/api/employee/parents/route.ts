@@ -362,7 +362,7 @@ export async function POST(request: Request) {
     phone,
     password,
     role: "PARENT",
-    avatar: "/placeholder-user.jpg",
+    avatar: "",
     classId: childId,
   })
 

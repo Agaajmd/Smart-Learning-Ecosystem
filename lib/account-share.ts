@@ -28,16 +28,23 @@ function normalizePhoneForWhatsapp(phone?: string) {
 }
 
 export function buildAccountShareMessage(payload: AccountSharePayload) {
+  const appUrl = "https://justa4.vercel.app"
+  const creatorUrl = "https://aegix-solutions.vercel.app"
+
   const lines = [
-    "Informasi Akun SIAKAD",
+    "Halo, berikut informasi akun SIAKAD Anda:",
     "",
     `Role: ${payload.roleLabel}`,
     `Nama: ${payload.name}`,
     `Email: ${payload.email}`,
     `Nomor WhatsApp: ${payload.phone || "-"}`,
-    `Password: ${payload.password || "(isi password belum tersedia)"}`,
+    `Password Sementara: ${payload.password || "(isi password belum tersedia)"}`,
+    "",
+    `Login Website: ${appUrl}`,
     "",
     "Silakan login dan segera ganti password setelah berhasil masuk.",
+    "",
+    `Created by Aegix Solutions: ${creatorUrl}`,
   ]
 
   return lines.join("\n")

@@ -40,6 +40,11 @@ export default function AdminUsersPage() {
   const [isDeleting, setIsDeleting] = useState(false)
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 250)
 
+  const resolveAvatar = (value: unknown) => {
+    const next = String(value || "").trim()
+    return next || "/placeholder-user.jpg"
+  }
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -276,7 +281,7 @@ export default function AdminUsersPage() {
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <img
-                      src={user.avatar || "/placeholder.svg?height=48&width=48&query=user portrait"}
+                      src={resolveAvatar(user.avatar)}
                       alt={user.name}
                       className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-slate-200 shrink-0"
                     />
@@ -332,7 +337,7 @@ export default function AdminUsersPage() {
             <div className="space-y-4">
               <div className="flex items-center gap-3 sm:gap-4">
                 <img
-                  src={selectedUser.avatar || "/placeholder.svg?height=80&width=80&query=user portrait"}
+                  src={resolveAvatar(selectedUser.avatar)}
                   alt={selectedUser.name}
                   className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-2 border-slate-200"
                 />

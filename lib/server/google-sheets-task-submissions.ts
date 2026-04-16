@@ -1,6 +1,7 @@
 import "server-only"
 
 import { google } from "googleapis"
+import { normalizeDriveMediaUrlList } from "@/lib/google-drive"
 import type { TaskStatus, TaskSubmission } from "@/lib/data-model"
 
 const PRIMARY_SUBMISSIONS_SHEET_NAME = "Tugas Saya"
@@ -151,8 +152,8 @@ function isHeaderRow(row: string[]) {
 }
 
 function normalizeSubmissionRow(row: string[]): TaskSubmission {
-  const attachmentUrls = parseSerializedUrlList(row[4] || "")
-  const imageUrls = parseSerializedUrlList(row[5] || "")
+  const attachmentUrls = normalizeDriveMediaUrlList(parseSerializedUrlList(row[4] || ""))
+  const imageUrls = normalizeDriveMediaUrlList(parseSerializedUrlList(row[5] || ""))
   return {
     id: row[0] || "",
     taskId: row[1] || "",
@@ -170,16 +171,18 @@ function normalizeSubmissionRow(row: string[]): TaskSubmission {
 }
 
 function toSubmissionSheetRow(submission: TaskSubmission, updatedAt: string) {
-  const attachmentUrls = Array.isArray(submission.attachmentUrls)
+  const attachmentUrlsRaw = Array.isArray(submission.attachmentUrls)
     ? submission.attachmentUrls
     : submission.attachmentUrl
       ? [submission.attachmentUrl]
       : []
-  const imageUrls = Array.isArray(submission.imageUrls)
+  const imageUrlsRaw = Array.isArray(submission.imageUrls)
     ? submission.imageUrls
     : submission.imageUrl
       ? [submission.imageUrl]
       : []
+  const attachmentUrls = normalizeDriveMediaUrlList(attachmentUrlsRaw)
+  const imageUrls = normalizeDriveMediaUrlList(imageUrlsRaw)
 
   return [
     submission.id,
@@ -362,16 +365,18 @@ export async function upsertDbTaskSubmission(input: TaskSubmission): Promise<Tas
   const nextImageUrls = nextImageUrlsRaw
     .map((item) => normalizeMaybeString(item))
     .filter((item): item is string => Boolean(item))
+  const safeAttachmentUrls = normalizeDriveMediaUrlList(nextAttachmentUrls)
+  const safeImageUrls = normalizeDriveMediaUrlList(nextImageUrls)
 
   const next: TaskSubmission = {
     id: input.id || existingSubmission?.id || `sub-${Date.now()}`,
     taskId: String(input.taskId || existingSubmission?.taskId || "").trim(),
     studentId: String(input.studentId || existingSubmission?.studentId || "").trim(),
     submittedAt: input.submittedAt || existingSubmission?.submittedAt || now,
-    attachmentUrl: nextAttachmentUrls[0],
-    attachmentUrls: nextAttachmentUrls.length > 0 ? [...new Set(nextAttachmentUrls)] : undefined,
-    imageUrl: nextImageUrls[0],
-    imageUrls: nextImageUrls.length > 0 ? [...new Set(nextImageUrls)] : undefined,
+    attachmentUrl: safeAttachmentUrls[0],
+    attachmentUrls: safeAttachmentUrls.length > 0 ? [...new Set(safeAttachmentUrls)] : undefined,
+    imageUrl: safeImageUrls[0],
+    imageUrls: safeImageUrls.length > 0 ? [...new Set(safeImageUrls)] : undefined,
     attachmentName: normalizeMaybeString(input.attachmentName),
     score: input.score != null ? Number(input.score) : existingSubmission?.score,
     feedback: input.feedback != null ? String(input.feedback) : existingSubmission?.feedback,

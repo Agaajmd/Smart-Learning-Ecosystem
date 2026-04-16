@@ -1,6 +1,7 @@
 import "server-only"
 
 import { google } from "googleapis"
+import { normalizeDriveMediaUrlList } from "@/lib/google-drive"
 import type { Task } from "@/lib/data-model"
 
 const TASKS_SHEET_NAME = "tasks"
@@ -111,8 +112,8 @@ function serializeUrlList(list: string[]) {
 
 function normalizeTaskRow(row: string[]): Task {
   const maxScore = toNumber(row[11] || "", 100)
-  const attachmentUrls = parseSerializedUrlList(row[8] || "")
-  const imageUrls = parseSerializedUrlList(row[10] || "")
+  const attachmentUrls = normalizeDriveMediaUrlList(parseSerializedUrlList(row[8] || ""))
+  const imageUrls = normalizeDriveMediaUrlList(parseSerializedUrlList(row[10] || ""))
   return {
     id: row[0] || "",
     title: row[1] || "",
@@ -137,16 +138,18 @@ function isQuotaExceededError(error: unknown) {
 }
 
 function toTaskSheetRow(task: Task, updatedAt: string) {
-  const attachmentUrls = Array.isArray(task.attachmentUrls)
+  const attachmentUrlsRaw = Array.isArray(task.attachmentUrls)
     ? task.attachmentUrls
     : task.attachmentUrl
       ? [task.attachmentUrl]
       : []
-  const imageUrls = Array.isArray(task.imageUrls)
+  const imageUrlsRaw = Array.isArray(task.imageUrls)
     ? task.imageUrls
     : task.imageUrl
       ? [task.imageUrl]
       : []
+  const attachmentUrls = normalizeDriveMediaUrlList(attachmentUrlsRaw)
+  const imageUrls = normalizeDriveMediaUrlList(imageUrlsRaw)
 
   return [
     task.id,
@@ -277,18 +280,14 @@ async function getDbTaskRowById(id: string): Promise<{ task: Task; rowNumber: nu
 
 export async function createDbTask(input: Omit<Task, "id" | "createdAt"> & { id?: string; createdAt?: string }): Promise<Task> {
   const now = new Date().toISOString()
-  const attachmentUrls = [
+  const attachmentUrls = normalizeDriveMediaUrlList([
     ...(Array.isArray(input.attachmentUrls) ? input.attachmentUrls : []),
     ...(input.attachmentUrl ? [input.attachmentUrl] : []),
-  ]
-    .map((item) => String(item || "").trim())
-    .filter(Boolean)
-  const imageUrls = [
+  ])
+  const imageUrls = normalizeDriveMediaUrlList([
     ...(Array.isArray(input.imageUrls) ? input.imageUrls : []),
     ...(input.imageUrl ? [input.imageUrl] : []),
-  ]
-    .map((item) => String(item || "").trim())
-    .filter(Boolean)
+  ])
 
   const next: Task = {
     id: input.id || `task-${Date.now()}`,
@@ -351,6 +350,8 @@ export async function updateDbTaskById(input: Partial<Task> & { id: string }): P
   const normalizedImageUrls = nextImageUrls
     .map((item) => String(item || "").trim())
     .filter(Boolean)
+  const safeAttachmentUrls = normalizeDriveMediaUrlList(normalizedAttachmentUrls)
+  const safeImageUrls = normalizeDriveMediaUrlList(normalizedImageUrls)
 
   const next: Task = {
     id: current.id,
@@ -361,11 +362,11 @@ export async function updateDbTaskById(input: Partial<Task> & { id: string }): P
     teacherId: input.teacherId != null ? String(input.teacherId).trim() : current.teacherId,
     dueDate: input.dueDate != null ? String(input.dueDate).trim() : current.dueDate,
     createdAt: current.createdAt,
-    attachmentUrl: normalizedAttachmentUrls[0] || undefined,
-    attachmentUrls: normalizedAttachmentUrls.length > 0 ? [...new Set(normalizedAttachmentUrls)] : undefined,
+    attachmentUrl: safeAttachmentUrls[0] || undefined,
+    attachmentUrls: safeAttachmentUrls.length > 0 ? [...new Set(safeAttachmentUrls)] : undefined,
     attachmentName: input.attachmentName != null ? input.attachmentName : current.attachmentName,
-    imageUrl: normalizedImageUrls[0] || undefined,
-    imageUrls: normalizedImageUrls.length > 0 ? [...new Set(normalizedImageUrls)] : undefined,
+    imageUrl: safeImageUrls[0] || undefined,
+    imageUrls: safeImageUrls.length > 0 ? [...new Set(safeImageUrls)] : undefined,
     maxScore: input.maxScore != null ? Number(input.maxScore) || 100 : current.maxScore,
   }
 

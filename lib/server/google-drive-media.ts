@@ -2,61 +2,28 @@ import "server-only"
 
 import { Readable } from "node:stream"
 import { google } from "googleapis"
-
-const MEDIA_SHEET_NAME = "media_assets"
-const MEDIA_COLUMNS = ["id", "owner_type", "owner_id", "usage", "file_id", "url", "mime_type", "file_name", "created_at"]
-
-type ServiceAccount = {
-  client_email: string
-  private_key: string
-}
-
-function parseServiceAccount(raw: string): ServiceAccount {
-  const parsed = JSON.parse(raw)
-  const clientEmail = String(parsed.client_email || "")
-  const privateKey = String(parsed.private_key || "").replace(/\\n/g, "\n")
-
-  if (!clientEmail || !privateKey) {
-    throw new Error("Service account tidak valid. Pastikan client_email dan private_key tersedia.")
-  }
-
-  return {
-    client_email: clientEmail,
-    private_key: privateKey,
-  }
-}
-
-async function getServiceAccount(): Promise<ServiceAccount> {
-  const fromEnv = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
-  if (!fromEnv) {
-    throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON belum di-set.")
-  }
-  return parseServiceAccount(fromEnv)
-}
-
-function getSpreadsheetId(): string {
-  const spreadsheetId = process.env.GOOGLE_SHEETS_ID
-  if (!spreadsheetId) {
-    throw new Error("GOOGLE_SHEETS_ID belum di-set.")
-  }
-  return spreadsheetId
-}
+import { getImageUrl } from "@/lib/google-drive"
+import {
+  createGoogleDriveAuth,
+  GOOGLE_SCOPE_DRIVE_FILE,
+} from "@/lib/server/google-auth"
 
 async function getGoogleClients() {
-  const serviceAccount = await getServiceAccount()
-  const auth = new google.auth.JWT({
-    email: serviceAccount.client_email,
-    key: serviceAccount.private_key,
-    scopes: [
-      "https://www.googleapis.com/auth/spreadsheets",
-      "https://www.googleapis.com/auth/drive",
-    ],
-  })
+  const { auth: driveAuth, mode: driveAuthMode } = await createGoogleDriveAuth([GOOGLE_SCOPE_DRIVE_FILE])
 
   return {
-    sheets: google.sheets({ version: "v4", auth }),
-    drive: google.drive({ version: "v3", auth }),
+    drive: google.drive({ version: "v3", auth: driveAuth }),
+    driveAuthMode,
   }
+}
+
+function getDriveFolderId() {
+  const folderId = String(process.env.GOOGLE_DRIVE_FOLDER_ID || "").trim()
+  if (!folderId) {
+    throw new Error("GOOGLE_DRIVE_FOLDER_ID belum di-set.")
+  }
+
+  return folderId
 }
 
 function parseDataUrl(dataUrl: string): { mimeType: string; buffer: Buffer } {
@@ -71,82 +38,27 @@ function parseDataUrl(dataUrl: string): { mimeType: string; buffer: Buffer } {
   }
 }
 
-async function ensureMediaSheetReady() {
-  const { sheets } = await getGoogleClients()
-  const spreadsheetId = getSpreadsheetId()
-
-  const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId })
-  const hasSheet =
-    spreadsheet.data.sheets?.some((sheet) => sheet.properties?.title === MEDIA_SHEET_NAME) ?? false
-
-  if (!hasSheet) {
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId,
-      requestBody: {
-        requests: [
-          {
-            addSheet: {
-              properties: {
-                title: MEDIA_SHEET_NAME,
-              },
-            },
-          },
-        ],
-      },
-    })
+function extractErrorMessage(error: unknown) {
+  const err = error as {
+    message?: string
+    response?: { data?: { error?: { message?: string } } }
+    errors?: Array<{ message?: string }>
   }
 
-  const headerRes = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `${MEDIA_SHEET_NAME}!A1:I1`,
-  })
-
-  const firstRow = headerRes.data.values?.[0] || []
-  if (firstRow.length === MEDIA_COLUMNS.length) {
-    return
-  }
-
-  await sheets.spreadsheets.values.update({
-    spreadsheetId,
-    range: `${MEDIA_SHEET_NAME}!A1:I1`,
-    valueInputOption: "RAW",
-    requestBody: {
-      values: [MEDIA_COLUMNS],
-    },
-  })
+  return String(
+    err?.response?.data?.error?.message ||
+      err?.errors?.[0]?.message ||
+      err?.message ||
+      "",
+  )
 }
 
-async function appendMediaAssetRow(input: {
-  ownerType: string
-  ownerId: string
-  usage: string
-  fileId: string
-  url: string
-  mimeType: string
-  fileName: string
-}) {
-  await ensureMediaSheetReady()
-  const { sheets } = await getGoogleClients()
-  const spreadsheetId = getSpreadsheetId()
+function isServiceAccountQuotaError(error: unknown) {
+  const err = error as { code?: number; status?: number }
+  const message = extractErrorMessage(error).toLowerCase()
+  const isForbidden = err?.code === 403 || err?.status === 403
 
-  await sheets.spreadsheets.values.append({
-    spreadsheetId,
-    range: `${MEDIA_SHEET_NAME}!A:I`,
-    valueInputOption: "RAW",
-    requestBody: {
-      values: [[
-        `media-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        input.ownerType,
-        input.ownerId,
-        input.usage,
-        input.fileId,
-        input.url,
-        input.mimeType,
-        input.fileName,
-        new Date().toISOString(),
-      ]],
-    },
-  })
+  return isForbidden && message.includes("service accounts do not have storage quota")
 }
 
 export async function uploadMediaDataUrlToDrive(input: {
@@ -156,45 +68,56 @@ export async function uploadMediaDataUrlToDrive(input: {
   ownerId: string
   usage: string
 }): Promise<{ fileId: string; url: string }> {
-  const { drive } = await getGoogleClients()
+  const { drive, driveAuthMode } = await getGoogleClients()
+  const folderId = getDriveFolderId()
   const { mimeType, buffer } = parseDataUrl(input.dataUrl)
 
-  const created = await drive.files.create({
-    requestBody: {
-      name: input.fileName,
-      mimeType,
-    },
-    media: {
-      mimeType,
-      body: Readable.from(buffer),
-    },
-    fields: "id",
-  })
+  let fileId = ""
+  try {
+    const created = await drive.files.create({
+      requestBody: {
+        name: input.fileName,
+        mimeType,
+        parents: [folderId],
+      },
+      media: {
+        mimeType,
+        body: Readable.from(buffer),
+      },
+      supportsAllDrives: true,
+      fields: "id",
+    })
 
-  const fileId = String(created.data.id || "")
-  if (!fileId) {
-    throw new Error("Gagal upload file ke Google Drive")
+    fileId = String(created.data.id || "")
+    if (!fileId) {
+      throw new Error("Gagal upload file ke Google Drive")
+    }
+
+    await drive.permissions.create({
+      fileId,
+      supportsAllDrives: true,
+      requestBody: {
+        role: "reader",
+        type: "anyone",
+      },
+    })
+  } catch (error) {
+    if (isServiceAccountQuotaError(error)) {
+      if (driveAuthMode === "oauth-refresh-token") {
+        throw new Error(
+          "Upload gagal karena kuota Google Drive akun OAuth tidak mencukupi. Bersihkan storage akun Drive, atau ganti akun OAuth yang masih punya kuota.",
+        )
+      }
+
+      throw new Error(
+        "Upload gagal: Service Account tidak punya kuota My Drive. Gunakan folder Shared Drive untuk GOOGLE_DRIVE_FOLDER_ID, atau set GOOGLE_DRIVE_OAUTH_CLIENT_ID/GOOGLE_DRIVE_OAUTH_CLIENT_SECRET/GOOGLE_DRIVE_OAUTH_REFRESH_TOKEN agar upload memakai akun Google biasa.",
+      )
+    }
+
+    throw error
   }
 
-  await drive.permissions.create({
-    fileId,
-    requestBody: {
-      role: "reader",
-      type: "anyone",
-    },
-  })
-
-  const publicUrl = `https://drive.google.com/uc?id=${fileId}`
-
-  await appendMediaAssetRow({
-    ownerType: input.ownerType,
-    ownerId: input.ownerId,
-    usage: input.usage,
-    fileId,
-    url: publicUrl,
-    mimeType,
-    fileName: input.fileName,
-  })
+  const publicUrl = getImageUrl(fileId)
 
   return {
     fileId,

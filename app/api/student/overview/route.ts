@@ -8,6 +8,7 @@ import { getAllDbActivityPointsFromSheet } from "@/lib/server/google-sheets-acti
 import { getSessionUser } from "@/lib/server/session-user"
 import { createClassIdResolver } from "@/lib/server/class-id-resolver"
 import { assignStudentSeatsToClasses } from "@/lib/server/class-seat-layout"
+import { normalizeDriveMediaUrl } from "@/lib/google-drive"
 import {
   getDbAttendance,
   getDbClasses,
@@ -61,6 +62,8 @@ export async function GET(request: Request) {
   const { resolveClassId } = createClassIdResolver(classesFromSheet)
   const sessionUser = await getSessionUser()
 
+  const resolveAvatar = (value: unknown) => normalizeDriveMediaUrl(value) || "/placeholder-user.jpg"
+
   const sheetStudents = users
     .filter((user) => user.role === "STUDENT" && user.isActive)
     .map((user) => ({
@@ -68,7 +71,7 @@ export async function GET(request: Request) {
       name: user.name,
       email: user.email,
       phone: user.phone,
-      avatar: user.avatar,
+      avatar: resolveAvatar(user.avatar),
       role: "STUDENT" as const,
       classId: resolveClassId(user.classId),
       paymentStatus: "UNPAID" as const,
@@ -84,6 +87,7 @@ export async function GET(request: Request) {
 
   const storeStudents = getDbStudents().map((student) => ({
     ...student,
+    avatar: resolveAvatar(student.avatar),
     classId: resolveClassId(student.classId),
   }))
 
@@ -138,7 +142,13 @@ export async function GET(request: Request) {
   }, {} as Record<string, string>)
 
   const nextClass = schedules[0] || null
-  const teacher = nextClass ? teachers.find((item) => item.id === nextClass.teacherId) || null : null
+  const teacherRaw = nextClass ? teachers.find((item) => item.id === nextClass.teacherId) || null : null
+  const teacher = teacherRaw
+    ? {
+        ...teacherRaw,
+        avatar: resolveAvatar(teacherRaw.avatar),
+      }
+    : null
   const studentClass = classesFromSheet.find((item) => item.id === classId) || getDbClasses().find((item) => item.id === classId) || null
   const classmates = students.filter((item) => item.classId === classId)
   const classmateIds = new Set(classmates.map((item) => item.id))

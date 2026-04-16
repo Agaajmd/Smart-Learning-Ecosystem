@@ -1,6 +1,7 @@
 import "server-only"
 
 import { google } from "googleapis"
+import { normalizeDriveMediaUrl } from "@/lib/google-drive"
 import type { UserRole } from "@/lib/data-model"
 
 const WALLET_TOPUPS_SHEET_NAME = "wallet_topups"
@@ -149,7 +150,7 @@ function normalizeWalletTopupRow(row: string[]): WalletTopupRecord {
     destinationAccount: row[6] || "",
     destinationName: row[7] || "",
     proofReference: normalizeMaybeString(row[8]),
-    proofUrl: normalizeMaybeString(row[9]),
+    proofUrl: normalizeDriveMediaUrl(row[9]),
     status: normalizeStatus(row[10]),
     requestedAt: row[11] || new Date().toISOString(),
     processedAt: normalizeMaybeString(row[12]),
@@ -318,7 +319,7 @@ export async function createDbWalletTopup(input: {
     destinationAccount: String(input.destinationAccount || "").trim(),
     destinationName: String(input.destinationName || "").trim(),
     proofReference: normalizeMaybeString(input.proofReference),
-    proofUrl: normalizeMaybeString(input.proofUrl),
+    proofUrl: normalizeDriveMediaUrl(input.proofUrl),
     status: "PENDING",
     requestedAt: new Date().toISOString(),
   }

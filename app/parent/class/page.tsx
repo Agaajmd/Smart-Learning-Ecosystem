@@ -6,14 +6,12 @@ import { ClassRoomGrid } from "@/components/organisms/class-room-grid"
 import { GlassCard } from "@/components/molecules/glass-card"
 import type { Student } from "@/lib/data-model"
 import { 
-  Users, 
-  GraduationCap, 
-  MapPin, 
-  User,
+  GraduationCap,
+  MapPin,
   Trophy,
-  Flame,
+  TrendingDown,
+  TrendingUp,
   CheckCircle,
-  AlertCircle,
   ChevronDown,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -49,9 +47,22 @@ export default function ParentClassPage() {
     load()
   }, [selectedChild?.id])
 
+  const resolveAvatar = (value: unknown) => {
+    const next = String(value || "").trim()
+    return next || "/placeholder-user.jpg"
+  }
+
+  const getNetPoints = (target: any) => {
+    const positivePoints = Number(target?.positivePoints ?? 0)
+    const negativePoints = Number(target?.negativePoints ?? 0)
+    const total = target?.totalPoints ?? target?.points
+    if (total != null) return Number(total)
+    return positivePoints - negativePoints
+  }
+
   const childRank = useMemo(() => {
     if (!selectedChild) return 0
-    return [...classmates].sort((a, b) => b.xp - a.xp).findIndex((s) => s.id === selectedChild.id) + 1
+    return [...classmates].sort((a, b) => getNetPoints(b) - getNetPoints(a)).findIndex((s) => s.id === selectedChild.id) + 1
   }, [classmates, selectedChild])
 
   if (!parent || !selectedChild) {
@@ -72,49 +83,25 @@ export default function ParentClassPage() {
     )
   }
 
-  // Find child's row and column position
   const seatPosition = `Baris ${selectedChild.seatRow + 1}, Kolom ${selectedChild.seatCol + 1}`
+  const presentCount = classmates.filter((s) => s.attendance === "PRESENT").length
+  const sickCount = classmates.filter((s) => s.attendance === "SICK").length
+  const alphaCount = classmates.filter((s) => s.attendance === "ALPHA").length
 
-  // Calculate class stats
-  const presentCount = classmates.filter(s => s.attendance === "PRESENT").length
-  const sickCount = classmates.filter(s => s.attendance === "SICK").length
-  const alphaCount = classmates.filter(s => s.attendance === "ALPHA").length
-  
-  // Top students by XP
   const topStudents = [...classmates]
-    .sort((a, b) => b.xp - a.xp)
+    .sort((a, b) => getNetPoints(b) - getNetPoints(a))
     .slice(0, 5)
-  
-  // Attendance status for selected child
-  const getAttendanceStatus = () => {
-    switch (selectedChild.attendance) {
-      case "PRESENT":
-        return { label: "Hadir", color: "text-green-600", bg: "bg-green-50", border: "border-green-200", icon: CheckCircle }
-      case "SICK":
-        return { label: "Sakit", color: "text-yellow-600", bg: "bg-yellow-50", border: "border-yellow-200", icon: AlertCircle }
-      case "ALPHA":
-        return { label: "Alpha", color: "text-red-600", bg: "bg-red-50", border: "border-red-200", icon: AlertCircle }
-      default:
-        return { label: "Unknown", color: "text-slate-600", bg: "bg-slate-50", border: "border-slate-200", icon: User }
-    }
-  }
-  
-  const attendanceStatus = getAttendanceStatus()
-  const AttendanceIcon = attendanceStatus.icon
-  const childPositivePoints = Number((selectedChild as any).positivePoints ?? 0)
-  const childNegativePoints = Number((selectedChild as any).negativePoints ?? 0)
 
   return (
     <DashboardLayout role="PARENT" userName={parent.name} userAvatar={parent.avatar}>
       <div className="max-w-4xl mx-auto space-y-6 px-1">
-        {/* Header with Child Selector */}
+        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold text-slate-800">Kelas Anak</h1>
-            <p className="text-slate-500">Lihat informasi kelas anak Anda</p>
+            <h1 className="text-xl font-bold text-slate-800">Layout Kelas</h1>
+            <p className="text-slate-500">Lihat posisi dan kondisi kelas anak Anda</p>
           </div>
 
-          {/* Child Selector (if multiple children) */}
           {children.length > 1 && (
             <div className="relative">
               <button
@@ -122,7 +109,7 @@ export default function ParentClassPage() {
                 className="flex items-center gap-3 px-4 py-2.5 bg-white border border-slate-200 rounded-xl shadow-sm hover:bg-slate-50 transition-all duration-200 min-w-[200px]"
               >
                 <img 
-                  src={selectedChild.avatar} 
+                  src={resolveAvatar(selectedChild.avatar)} 
                   alt={selectedChild.name}
                   className="w-8 h-8 rounded-full object-cover"
                 />
@@ -136,7 +123,6 @@ export default function ParentClassPage() {
                 )} />
               </button>
 
-              {/* Dropdown */}
               {showChildSelector && (
                 <>
                   <div 
@@ -166,7 +152,7 @@ export default function ParentClassPage() {
                             )}
                           >
                             <img 
-                              src={child.avatar} 
+                              src={resolveAvatar(child.avatar)} 
                               alt={child.name}
                               className="w-10 h-10 rounded-full object-cover"
                             />
@@ -191,55 +177,33 @@ export default function ParentClassPage() {
           )}
         </div>
 
-        {/* Child Info Card */}
+        {/* Class Info Card */}
         <GlassCard className="p-4">
-          <div className="flex items-center gap-4">
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl">
+              <GraduationCap className="w-8 h-8 text-white" />
+            </div>
             <img 
-              src={selectedChild.avatar} 
+              src={resolveAvatar(selectedChild.avatar)} 
               alt={selectedChild.name}
               className="w-16 h-16 rounded-xl object-cover ring-2 ring-slate-200"
             />
             <div className="flex-1">
-              <h2 className="text-lg font-bold text-slate-800">{selectedChild.name}</h2>
-              <p className="text-sm text-slate-500">{childClass.name} • Grade {childClass.grade}</p>
+              <h2 className="text-lg font-bold text-slate-800">{childClass.name}</h2>
+              <p className="text-sm text-slate-500">Grade {childClass.grade}</p>
               {teacher && (
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xs text-slate-500">Wali Kelas: {teacher.name}</span>
+                  <img
+                    src={resolveAvatar(teacher.avatar)}
+                    alt={teacher.name}
+                    className="w-6 h-6 rounded-full object-cover"
+                  />
+                  <span className="text-sm text-slate-600">Wali Kelas: {teacher.name}</span>
                 </div>
               )}
             </div>
-            <div className={cn(
-              "px-3 py-2 rounded-xl border flex items-center gap-2",
-              attendanceStatus.bg,
-              attendanceStatus.border
-            )}>
-              <AttendanceIcon className={cn("w-4 h-4", attendanceStatus.color)} />
-              <span className={cn("text-sm font-medium", attendanceStatus.color)}>
-                {attendanceStatus.label}
-              </span>
-            </div>
           </div>
         </GlassCard>
-
-        {/* Child Stats */}
-        <div className="grid grid-cols-4 gap-3">
-          <GlassCard className="text-center py-3">
-            <p className="text-xl font-bold text-blue-600">#{childRank}</p>
-            <p className="text-[10px] text-slate-500">Rank Kelas</p>
-          </GlassCard>
-          <GlassCard className="text-center py-3">
-            <p className="text-xl font-bold text-amber-600">{selectedChild.coins}</p>
-            <p className="text-[10px] text-slate-500">Koin</p>
-          </GlassCard>
-          <GlassCard className="text-center py-3">
-            <p className="text-xl font-bold text-orange-600">{selectedChild.streak}</p>
-            <p className="text-[10px] text-slate-500">Hari Streak</p>
-          </GlassCard>
-          <GlassCard className="text-center py-3">
-            <p className="text-xl font-bold text-slate-800">{selectedChild.xp.toLocaleString()}</p>
-            <p className="text-[10px] text-slate-500">XP</p>
-          </GlassCard>
-        </div>
 
         {/* Seat Position */}
         <GlassCard className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
@@ -248,38 +212,37 @@ export default function ParentClassPage() {
               <MapPin className="w-6 h-6 text-blue-600" />
             </div>
             <div className="flex-1">
-              <p className="text-sm text-blue-600 font-medium">Posisi Duduk</p>
+              <p className="text-sm text-blue-600 font-medium">Posisi {selectedChild.name.split(" ")[0]}</p>
               <h3 className="text-lg font-bold text-slate-800">{seatPosition}</h3>
             </div>
             <div className="text-right">
-              <p className="text-xs text-slate-500">Poin Positif</p>
-              <p className="text-xl font-bold text-emerald-600">+{childPositivePoints}</p>
-              <p className="text-xs text-slate-500 mt-1">Poin Negatif</p>
-              <p className="text-xl font-bold text-rose-600">-{childNegativePoints}</p>
+              <p className="text-sm text-slate-500">Rank di Kelas</p>
+              <p className="text-2xl font-bold text-blue-600">#{childRank}</p>
             </div>
           </div>
         </GlassCard>
 
         {/* Class Stats */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-4 gap-3">
           <GlassCard className="text-center py-3">
-            <div className="flex items-center justify-center gap-2 mb-1">
-              <Users className="w-4 h-4 text-slate-500" />
-            </div>
             <p className="text-2xl font-bold text-slate-800">{classmates.length}</p>
             <p className="text-xs text-slate-500">Total Siswa</p>
           </GlassCard>
           <GlassCard className="text-center py-3">
             <p className="text-2xl font-bold text-green-600">{presentCount}</p>
-            <p className="text-xs text-slate-500">Hadir Hari Ini</p>
+            <p className="text-xs text-slate-500">Present</p>
           </GlassCard>
           <GlassCard className="text-center py-3">
-            <p className="text-2xl font-bold text-orange-600">{sickCount + alphaCount}</p>
-            <p className="text-xs text-slate-500">Tidak Hadir</p>
+            <p className="text-2xl font-bold text-amber-600">{sickCount}</p>
+            <p className="text-xs text-slate-500">Sick</p>
+          </GlassCard>
+          <GlassCard className="text-center py-3">
+            <p className="text-2xl font-bold text-red-600">{alphaCount}</p>
+            <p className="text-xs text-slate-500">Alpha</p>
           </GlassCard>
         </div>
 
-        {/* Class Layout with highlight */}
+        {/* Class Layout */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-slate-800">Layout Kelas</h2>
@@ -296,11 +259,11 @@ export default function ParentClassPage() {
           />
         </div>
 
-        {/* Top Students in Class */}
+        {/* Top Students */}
         <GlassCard className="p-4">
           <div className="flex items-center gap-2 mb-4">
             <Trophy className="w-5 h-5 text-amber-500" />
-            <h2 className="text-lg font-semibold text-slate-800">Top 5 Siswa</h2>
+            <h2 className="text-lg font-semibold text-slate-800">Top 5 Poin Siswa</h2>
           </div>
           <div className="space-y-3">
             {topStudents.map((s, idx) => (
@@ -323,7 +286,7 @@ export default function ParentClassPage() {
                   {idx + 1}
                 </div>
                 <img 
-                  src={s.avatar} 
+                  src={resolveAvatar(s.avatar)} 
                   alt={s.name}
                   className="w-10 h-10 rounded-full object-cover"
                 />
@@ -336,14 +299,18 @@ export default function ParentClassPage() {
                   </p>
                   <div className="flex items-center gap-3 text-xs text-slate-500">
                     <span className="flex items-center gap-1">
-                      <Flame className="w-3 h-3 text-orange-500" />
-                      {s.streak} hari
+                      <TrendingUp className="w-3 h-3 text-emerald-500" />
+                      +{Number((s as any).positivePoints ?? 0)}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <TrendingDown className="w-3 h-3 text-rose-500" />
+                      -{Number((s as any).negativePoints ?? 0)}
                     </span>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-slate-800">{s.xp.toLocaleString()}</p>
-                  <p className="text-xs text-slate-500">XP</p>
+                  <p className="text-sm font-bold text-slate-800">{getNetPoints(s).toLocaleString()}</p>
+                  <p className="text-xs text-slate-500">Total Poin</p>
                 </div>
               </div>
             ))}

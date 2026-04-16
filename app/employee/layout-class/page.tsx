@@ -8,7 +8,7 @@ import { LayoutGrid, Save, RotateCcw, Users, Grid3X3, Shuffle, Edit3, X } from "
 
 type Employee = { id: string; homeroomClassId?: string }
 type ClassRoom = { id: string; name: string; rows: number; cols: number }
-type Student = { id: string; name: string; classId: string }
+type Student = { id: string; name: string; classId: string; avatar?: string }
 
 type SeatPosition = { studentId: string | null; row: number; col: number }
 
@@ -121,8 +121,22 @@ export default function TeacherClassLayoutPage() {
                 const seat = seats.find((s) => s.row === row && s.col === col)
                 const student = getStudent(seat?.studentId || null)
                 return (
-                  <div key={`${row}-${col}`} className="w-20 h-16 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-xs text-slate-700 text-center px-1">
-                    {student?.name || "Kosong"}
+                  <div
+                    key={`${row}-${col}`}
+                    className="w-24 h-20 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-xs text-slate-700 text-center px-1"
+                  >
+                    {student ? (
+                      <div className="flex flex-col items-center gap-1 w-full">
+                        <img
+                          src={student.avatar || "/placeholder-user.jpg"}
+                          alt={student.name}
+                          className="w-8 h-8 rounded-full object-cover border border-slate-200"
+                        />
+                        <span className="text-[10px] leading-tight line-clamp-2">{student.name}</span>
+                      </div>
+                    ) : (
+                      "Kosong"
+                    )}
                   </div>
                 )
               })}

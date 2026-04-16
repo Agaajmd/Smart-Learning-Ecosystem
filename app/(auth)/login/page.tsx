@@ -147,12 +147,12 @@ export default function LoginPage() {
           <p className="text-center text-slate-400 text-xs">
             © 2025 Aegix SLE by{" "}
             <a 
-              href="https://profile-portfolio-aga.vercel.app/" 
+              href="https://nurjagadmuhammaddani.vercel.app/" 
               target="_blank" 
               rel="noopener noreferrer"
               className="text-blue-500 hover:text-blue-600 underline transition-colors"
             >
-              Aga
+              Agaaa
             </a>. All rights reserved.
           </p>
         </div>

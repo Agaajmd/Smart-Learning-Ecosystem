@@ -61,7 +61,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       name: targetUser?.name || "",
       email: targetUser?.email || "",
       phone: targetUser?.phone,
-      avatar: targetUser?.avatar || "/placeholder-user.jpg",
+      avatar: targetUser?.avatar || "",
       role: "ADMIN" as const,
     }
 
@@ -80,7 +80,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     name: targetUser?.name || "",
     email: targetUser?.email || "",
     phone: targetUser?.phone,
-    avatar: targetUser?.avatar || "/placeholder-user.jpg",
+    avatar: targetUser?.avatar || "",
     role: "EMPLOYEE" as const,
     subject: targetUser?.subject || "",
     rating: 0,

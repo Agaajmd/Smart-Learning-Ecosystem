@@ -8,8 +8,8 @@ import { GlassCard } from "@/components/molecules/glass-card"
 import { GlassModal } from "@/components/molecules/glass-modal"
 import { GlassButton } from "@/components/atoms/glass-button"
 import { GlassInput } from "@/components/atoms/glass-input"
+import { ImageUploadModal } from "@/components/molecules/image-upload"
 import {
-  User,
   Mail,
   Crown,
   Edit,
@@ -17,13 +17,7 @@ import {
   Briefcase,
   School,
   DollarSign,
-  TrendingUp,
-  Award,
-  Calendar,
-  CheckCircle,
   Camera,
-  Phone,
-  Upload,
 } from "lucide-react"
 
 export default function SuperAdminProfile() {
@@ -36,7 +30,7 @@ export default function SuperAdminProfile() {
   const [showAvatarModal, setShowAvatarModal] = useState(false)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [isSavingAvatar, setIsSavingAvatar] = useState(false)
-  const [editForm, setEditForm] = useState({ name: "", email: "", phone: "081234567890" })
+  const [editForm, setEditForm] = useState({ name: "", email: "", password: "" })
 
   useEffect(() => {
     let active = true
@@ -52,7 +46,12 @@ export default function SuperAdminProfile() {
 
         if (data.superAdmin) {
           setSuperAdmin(data.superAdmin)
-          setEditForm((prev) => ({ ...prev, name: data.superAdmin.name || "", email: data.superAdmin.email || "" }))
+          setEditForm((prev) => ({
+            ...prev,
+            name: data.superAdmin.name || "",
+            email: data.superAdmin.email || "",
+            password: "",
+          }))
         }
         if (data.stats) {
           setStudentsCount(Number(data.stats.studentsCount || 0))
@@ -71,13 +70,6 @@ export default function SuperAdminProfile() {
     }
   }, [])
 
-  const achievements = [
-    { title: "10 Tahun Mengabdi", icon: Award, earned: classesCount > 0 },
-    { title: "Pengelolaan Anggaran", icon: DollarSign, earned: profit > 0 },
-    { title: "Pemimpin Pertumbuhan", icon: TrendingUp, earned: studentsCount > 0 && employeesCount > 0 },
-    { title: "Pembangun Komunitas", icon: GraduationCap, earned: studentsCount >= 100 },
-  ]
-
   if (!superAdmin) {
     return <RouteLoading />
   }
@@ -85,6 +77,7 @@ export default function SuperAdminProfile() {
   const handleSaveProfile = async () => {
     if (!superAdmin.id || isSavingProfile) return
     setIsSavingProfile(true)
+    const password = editForm.password.trim()
     try {
       const res = await fetch("/api/super-admin/profile", {
         method: "PATCH",
@@ -94,54 +87,55 @@ export default function SuperAdminProfile() {
           name: editForm.name,
           email: editForm.email,
           avatar: superAdmin.avatar,
+          ...(password ? { password } : {}),
         }),
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}))
+        throw new Error(String(payload?.error || "Gagal memperbarui profil"))
+      }
 
       setSuperAdmin((prev) => (prev ? { ...prev, name: editForm.name, email: editForm.email } : prev))
       setShowEditModal(false)
       toast.success("Profil berhasil diperbarui")
-    } catch {
-      toast.error("Gagal memperbarui profil")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal memperbarui profil")
     } finally {
       setIsSavingProfile(false)
     }
   }
 
-  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file && superAdmin.id) {
-      setIsSavingAvatar(true)
-      const reader = new FileReader()
-      reader.onload = async (event) => {
-        const avatar = String(event.target?.result || "")
-        if (!avatar) {
-          setIsSavingAvatar(false)
-          return
-        }
-        try {
-          const res = await fetch("/api/super-admin/profile", {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              id: superAdmin.id,
-              name: superAdmin.name,
-              email: superAdmin.email,
-              avatar,
-            }),
-          })
-          if (!res.ok) throw new Error()
+  const handleAvatarSave = async (imageData: string | null) => {
+    if (!imageData || !superAdmin.id || isSavingAvatar) return
 
-          setSuperAdmin((prev) => (prev ? { ...prev, avatar } : prev))
-          setShowAvatarModal(false)
-          toast.success("Foto profil berhasil diperbarui")
-        } catch {
-          toast.error("Gagal memperbarui foto profil")
-        } finally {
-          setIsSavingAvatar(false)
-        }
+    setIsSavingAvatar(true)
+    try {
+      const res = await fetch("/api/super-admin/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: superAdmin.id,
+          name: superAdmin.name,
+          email: superAdmin.email,
+          avatar: imageData,
+        }),
+      })
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}))
+        throw new Error(String(payload?.error || "Gagal memperbarui foto profil"))
       }
-      reader.readAsDataURL(file)
+
+      const data = await res.json().catch(() => ({}))
+      const nextAvatar = String(data?.superAdmin?.avatar || imageData)
+
+      setSuperAdmin((prev) => (prev ? { ...prev, avatar: nextAvatar } : prev))
+      setShowAvatarModal(false)
+      toast.success("Foto profil berhasil diperbarui")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal memperbarui foto profil")
+      throw error
+    } finally {
+      setIsSavingAvatar(false)
     }
   }
 
@@ -207,118 +201,14 @@ export default function SuperAdminProfile() {
           </GlassCard>
         </div>
 
-        {/* Principal Information */}
-        <GlassCard>
-          <h2 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
-            <User className="w-5 h-5 text-indigo-500" />
-            Informasi Kepala Sekolah
-          </h2>
-
-          <div className="space-y-4">
-            <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-              <Crown className="w-5 h-5 text-slate-400" />
-              <div>
-                <p className="text-xs text-slate-400">Jabatan</p>
-                <p className="font-medium text-slate-800">Kepala Sekolah / Super Admin</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-              <Calendar className="w-5 h-5 text-slate-400" />
-              <div>
-                <p className="text-xs text-slate-400">Masa Jabatan</p>
-                <p className="font-medium text-slate-800">Sejak 2015 (10 tahun)</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
-              <CheckCircle className="w-5 h-5 text-slate-400" />
-              <div>
-                <p className="text-xs text-slate-400">Level Akses</p>
-                <p className="font-medium text-slate-800">Akses Penuh Sistem</p>
-              </div>
-            </div>
-          </div>
-        </GlassCard>
-
-        {/* Achievements */}
-        <GlassCard>
-          <h2 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
-            <Award className="w-5 h-5 text-amber-500" />
-            Pencapaian
-          </h2>
-
-          <div className="grid grid-cols-2 gap-3">
-            {achievements.map((achievement, index) => {
-              const Icon = achievement.icon
-              return (
-                <div
-                  key={index}
-                  className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
-                    achievement.earned
-                      ? "bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200"
-                      : "bg-slate-50 border border-slate-200 opacity-50"
-                  }`}
-                >
-                  <div className={`p-2 rounded-xl ${achievement.earned ? "bg-amber-100" : "bg-slate-100"}`}>
-                    <Icon className={`w-5 h-5 ${achievement.earned ? "text-amber-500" : "text-slate-400"}`} />
-                  </div>
-                  <div>
-                    <p
-                      className={`text-sm font-medium ${achievement.earned ? "text-slate-800" : "text-slate-500"}`}
-                    >
-                      {achievement.title}
-                    </p>
-                    <p className="text-xs text-slate-400">{achievement.earned ? "Tercapai" : "Terkunci"}</p>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </GlassCard>
-
-        {/* Quick Stats */}
-        <GlassCard>
-          <h2 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-indigo-500" />
-            Performa Sekolah
-          </h2>
-
-          <div className="space-y-3">
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Kepuasan Siswa</span>
-                <span className="text-slate-800 font-medium">92%</span>
-              </div>
-              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full w-[92%] bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full" />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Performa Guru</span>
-                <span className="text-slate-800 font-medium">88%</span>
-              </div>
-              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full w-[88%] bg-gradient-to-r from-blue-400 to-blue-500 rounded-full" />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Efisiensi Anggaran</span>
-                <span className="text-slate-800 font-medium">95%</span>
-              </div>
-              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full w-[95%] bg-gradient-to-r from-indigo-400 to-purple-500 rounded-full" />
-              </div>
-            </div>
-          </div>
-        </GlassCard>
-
         {/* Edit Profile Button */}
-        <GlassButton className="w-full py-4" onClick={() => setShowEditModal(true)}>
+        <GlassButton
+          className="w-full py-4"
+          onClick={() => {
+            setEditForm({ name: superAdmin.name || "", email: superAdmin.email || "", password: "" })
+            setShowEditModal(true)
+          }}
+        >
           <Edit className="w-5 h-5 mr-2" />
           Edit Profil
         </GlassButton>
@@ -352,12 +242,14 @@ export default function SuperAdminProfile() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Nomor Telepon</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Password Baru (Opsional)</label>
             <GlassInput
-              value={editForm.phone}
-              onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-              placeholder="Masukkan nomor telepon"
+              type="password"
+              value={editForm.password}
+              onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+              placeholder="Kosongkan jika tidak ingin ganti password"
             />
+            <p className="text-xs text-slate-500 mt-1">Minimal 6 karakter</p>
           </div>
         </div>
 
@@ -375,43 +267,13 @@ export default function SuperAdminProfile() {
         </div>
       </GlassModal>
 
-      {/* Avatar Upload Modal */}
-      <GlassModal
+      <ImageUploadModal
         isOpen={showAvatarModal}
         onClose={() => setShowAvatarModal(false)}
+        onSave={handleAvatarSave}
+        currentImage={superAdmin.avatar}
         title="Ganti Foto Profil"
-        size="sm"
-      >
-        <div className="flex flex-col items-center">
-          <img
-            src={superAdmin.avatar || "/placeholder.svg"}
-            alt="Current avatar"
-            className="w-24 h-24 rounded-full border-4 border-indigo-100 object-cover mb-4"
-          />
-
-          <label className="w-full">
-            <div className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
-              <Upload className="w-5 h-5 text-slate-400" />
-              <span className="text-slate-600">Pilih foto baru</span>
-            </div>
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleAvatarUpload}
-            />
-          </label>
-        </div>
-
-        <GlassButton
-          variant="ghost"
-          className="w-full mt-4"
-          disabled={isSavingAvatar}
-          onClick={() => setShowAvatarModal(false)}
-        >
-          Batal
-        </GlassButton>
-      </GlassModal>
+      />
     </DashboardLayout>
   )
 }

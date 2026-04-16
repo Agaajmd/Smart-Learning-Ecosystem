@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
 import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassCard } from "@/components/molecules/glass-card"
-import { EmptySkeleton } from "@/components/molecules/empty-skeleton"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { 
   ArrowLeft,
@@ -37,32 +36,69 @@ type Order = {
   notes?: string
 }
 
+const fetchWithTimeout = async (input: RequestInfo | URL, init?: RequestInit, timeoutMs = 12000) => {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal })
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
 export default function CanteenOwnerOrdersPage() {
   const [owner, setOwner] = useState<Owner | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
   const [filterStatus, setFilterStatus] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null)
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 250)
 
   useEffect(() => {
     const fetchOrders = async () => {
       try {
-        const ownerQuery = owner?.id ? `?ownerId=${encodeURIComponent(owner.id)}` : ""
-        const res = await fetch(`/api/canteen-owner/orders${ownerQuery}`, { cache: "no-store" })
-        if (!res.ok) return
-        const data = await res.json()
-        if (data.owner) setOwner(data.owner)
-        setOrders(data.orders || [])
-      } catch {
-        // Keep fallback data on error.
+        setLoadError(null)
+        const res = await fetchWithTimeout("/api/canteen-owner/orders", { cache: "no-store" })
+        const payload = await res.json().catch(() => ({}))
+        if (res.ok) {
+          if (payload.owner) setOwner(payload.owner)
+          setOrders(Array.isArray(payload.orders) ? payload.orders : [])
+          return
+        }
+
+        setLoadError(String(payload?.error || "Data order belum dapat dimuat"))
+
+        const dashboardRes = await fetchWithTimeout("/api/dashboard/canteen-owner", { cache: "no-store" })
+        if (dashboardRes.ok) {
+          const dashboardData = await dashboardRes.json()
+          if (dashboardData.owner) {
+            setOwner({
+              id: String(dashboardData.owner.id || ""),
+              name: String(dashboardData.owner.name || "Pemilik Kantin"),
+              avatar: String(dashboardData.owner.avatar || "/placeholder-user.jpg"),
+              canteenId: String(dashboardData.owner.canteenId || ""),
+            })
+          }
+          if (Array.isArray(dashboardData.orders)) {
+            setOrders(dashboardData.orders)
+          }
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          setLoadError("Waktu memuat data order terlalu lama. Coba lagi.")
+        } else {
+          setLoadError("Data order belum dapat dimuat")
+        }
       } finally {
         setIsLoading(false)
       }
     }
 
     fetchOrders()
-  }, [owner?.id])
+  }, [])
 
   const filteredOrders = useMemo(() => {
     const query = debouncedSearchQuery.toLowerCase()
@@ -74,6 +110,9 @@ export default function CanteenOwnerOrdersPage() {
   }, [orders, filterStatus, debouncedSearchQuery])
 
   const handleUpdateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+    if (updatingOrderId) return
+
+    setUpdatingOrderId(orderId)
     try {
       const res = await fetch(`/api/canteen-owner/orders/${orderId}`, {
         method: "PATCH",
@@ -81,12 +120,18 @@ export default function CanteenOwnerOrdersPage() {
         body: JSON.stringify({ status: newStatus }),
       })
 
-      if (!res.ok) throw new Error("Gagal update status")
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}))
+        throw new Error(String(payload?.error || "Gagal update status"))
+      }
+
       const data = await res.json()
-      setOrders(orders.map(o => o.id === orderId ? data.order : o))
+      setOrders((prev) => prev.map((item) => (item.id === orderId ? data.order : item)))
       toast.success(`Order berhasil di-update ke ${getStatusLabel(newStatus)}`)
-    } catch {
-      toast.error("Gagal update status order")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal update status order")
+    } finally {
+      setUpdatingOrderId(null)
     }
   }
 
@@ -160,7 +205,13 @@ export default function CanteenOwnerOrdersPage() {
       <DashboardLayout role="CANTEEN_OWNER" userName="Owner" userAvatar="/placeholder-user.jpg">
         <div className="max-w-4xl mx-auto px-1">
           <GlassCard className="p-6 text-center text-slate-600">
-            Data owner tidak ditemukan.
+            <p className="font-medium text-slate-700">Data owner belum terhubung</p>
+            <p className="text-sm mt-2 text-slate-500">
+              {loadError || "Silakan buka halaman profil owner untuk melengkapi data kantin."}
+            </p>
+            <Link href="/canteen-owner/profile" className="inline-flex mt-4 text-sm text-blue-600 hover:text-blue-700">
+              Buka Profil Owner
+            </Link>
           </GlassCard>
         </div>
       </DashboardLayout>
@@ -170,6 +221,11 @@ export default function CanteenOwnerOrdersPage() {
   return (
     <DashboardLayout role="CANTEEN_OWNER" userName={owner.name} userAvatar={owner.avatar}>
       <div className="max-w-4xl mx-auto space-y-6 px-1">
+        {loadError ? (
+          <GlassCard className="p-3 border border-amber-200 bg-amber-50 text-amber-700 text-sm">
+            {loadError}
+          </GlassCard>
+        ) : null}
         {/* Header */}
         <div className="flex items-center gap-3">
           <Link href="/canteen-owner" className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50">
@@ -268,13 +324,15 @@ export default function CanteenOwnerOrdersPage() {
                     <>
                       <button
                         onClick={() => handleUpdateOrderStatus(order.id, "PREPARING")}
+                        disabled={updatingOrderId === order.id}
                         className="flex-1 py-2 px-4 bg-blue-500 text-white rounded-xl text-sm font-medium hover:bg-blue-600 transition-colors flex items-center justify-center gap-2"
                       >
                         <ChefHat className="w-4 h-4" />
-                        Proses Order
+                        {updatingOrderId === order.id ? "Menyimpan..." : "Proses Order"}
                       </button>
                       <button
                         onClick={() => handleUpdateOrderStatus(order.id, "CANCELLED")}
+                        disabled={updatingOrderId === order.id}
                         className="py-2 px-4 bg-red-100 text-red-600 rounded-xl text-sm font-medium hover:bg-red-200 transition-colors"
                       >
                         <XCircle className="w-4 h-4" />
@@ -284,19 +342,21 @@ export default function CanteenOwnerOrdersPage() {
                   {order.status === "PREPARING" && (
                     <button
                       onClick={() => handleUpdateOrderStatus(order.id, "READY")}
+                      disabled={updatingOrderId === order.id}
                       className="flex-1 py-2 px-4 bg-green-500 text-white rounded-xl text-sm font-medium hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
                     >
                       <CheckCircle className="w-4 h-4" />
-                      Siap Diambil
+                      {updatingOrderId === order.id ? "Menyimpan..." : "Siap Diambil"}
                     </button>
                   )}
                   {order.status === "READY" && (
                     <button
                       onClick={() => handleUpdateOrderStatus(order.id, "COMPLETED")}
+                      disabled={updatingOrderId === order.id}
                       className="flex-1 py-2 px-4 bg-slate-800 text-white rounded-xl text-sm font-medium hover:bg-slate-900 transition-colors flex items-center justify-center gap-2"
                     >
                       <CheckCircle className="w-4 h-4" />
-                      Selesai
+                      {updatingOrderId === order.id ? "Menyimpan..." : "Selesai"}
                     </button>
                   )}
                 </div>
@@ -306,8 +366,13 @@ export default function CanteenOwnerOrdersPage() {
         </div>
 
         {filteredOrders.length === 0 && (
-          <GlassCard>
-            <EmptySkeleton rows={3} className="py-4" />
+          <GlassCard className="p-6 text-center">
+            <p className="font-medium text-slate-700">Belum ada order</p>
+            <p className="text-sm text-slate-500 mt-1">
+              {searchQuery || filterStatus !== "all"
+                ? "Tidak ada order yang cocok dengan pencarian atau filter status."
+                : "Order akan muncul otomatis saat ada transaksi baru dari siswa."}
+            </p>
           </GlassCard>
         )}
       </div>

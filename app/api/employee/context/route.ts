@@ -9,6 +9,7 @@ import { getAllDbActivityPointsFromSheet } from "@/lib/server/google-sheets-acti
 import { getSessionUser } from "@/lib/server/session-user"
 import { createClassIdResolver } from "@/lib/server/class-id-resolver"
 import { assignStudentSeatsToClasses } from "@/lib/server/class-seat-layout"
+import { normalizeDriveMediaUrl } from "@/lib/google-drive"
 import {
   getDbAttendance,
   getDbClasses,
@@ -73,7 +74,7 @@ export async function GET() {
         id: sessionUser.id,
         name: sessionUser.name,
         email: sessionUser.email,
-        avatar: sessionUser.avatar,
+        avatar: normalizeDriveMediaUrl(sessionUser.avatar) || "",
         role: "EMPLOYEE" as const,
         subject: sessionUser.subject || mappedTeacher?.subject || "",
         rating: mappedTeacher?.rating || 0,
@@ -145,7 +146,7 @@ export async function GET() {
       email: user.email,
       phone: user.phone,
       classId: resolveClassId(user.classId),
-      avatar: user.avatar,
+      avatar: normalizeDriveMediaUrl(user.avatar) || "",
       role: "STUDENT" as const,
       paymentStatus: "UNPAID" as const,
       behaviorScore: 0,
@@ -167,6 +168,7 @@ export async function GET() {
     studentMap.set(student.id, {
       ...(existing || student),
       ...student,
+      avatar: normalizeDriveMediaUrl(student.avatar) || normalizeDriveMediaUrl(existing?.avatar) || "",
       classId: student.classId || existing?.classId || "",
       paymentStatus: existing?.paymentStatus || student.paymentStatus,
       behaviorScore: Number(existing?.behaviorScore ?? student.behaviorScore),

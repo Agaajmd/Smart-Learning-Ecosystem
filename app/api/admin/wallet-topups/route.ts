@@ -8,6 +8,7 @@ import { getDbWalletTopups, setDbWalletTopups } from "@/lib/server/persistent-st
 import { logAudit } from "@/lib/server/audit-log"
 import { SCHOOL_WALLET_QRIS_IMAGE_PATH, SCHOOL_WALLET_TOPUP_METHODS } from "@/lib/wallet-topup"
 import type { WalletTopup, WalletTopupStatus } from "@/lib/data-model"
+import { normalizeDriveMediaUrl } from "@/lib/google-drive"
 
 const ALLOWED_STATUSES = new Set(["PENDING", "APPROVED", "REJECTED"])
 
@@ -36,7 +37,7 @@ export async function GET(request: Request) {
         destinationAccount: item.destinationAccount,
         destinationName: item.destinationName,
         proofReference: item.proofReference,
-        proofUrl: item.proofUrl,
+        proofUrl: normalizeDriveMediaUrl(item.proofUrl),
         status: item.status,
         requestedAt: item.requestedAt,
         processedAt: item.processedAt,
@@ -117,7 +118,7 @@ export async function PATCH(request: Request) {
       destinationAccount: updated.destinationAccount,
       destinationName: updated.destinationName,
       proofReference: updated.proofReference,
-      proofUrl: updated.proofUrl,
+      proofUrl: normalizeDriveMediaUrl(updated.proofUrl),
       status: updated.status,
       requestedAt: updated.requestedAt,
       processedAt: updated.processedAt,

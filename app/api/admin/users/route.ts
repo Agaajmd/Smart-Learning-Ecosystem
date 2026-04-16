@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { deleteDbUserById, getAllDbUsers } from "@/lib/server/google-sheets-auth"
 import { getAllDbActivityPointsFromSheet } from "@/lib/server/google-sheets-activity-points"
 import { getSessionUser } from "@/lib/server/session-user"
+import { normalizeDriveMediaUrl } from "@/lib/google-drive"
 import {
   getDbAdmins,
   getDbCanteenOwners,
@@ -44,6 +45,8 @@ export async function GET() {
     return acc
   }, {} as Record<string, { positivePoints: number; negativePoints: number; totalPoints: number }>)
 
+  const resolveAvatar = (value: unknown) => normalizeDriveMediaUrl(value) || "/placeholder-user.jpg"
+
   const visibleUsers = users
     .filter((user) => (sessionUser?.id ? user.id !== sessionUser.id : true))
     .map((user) => {
@@ -51,7 +54,7 @@ export async function GET() {
         id: user.id,
         name: user.name,
         email: user.email,
-        avatar: user.avatar,
+        avatar: resolveAvatar(user.avatar),
         role: user.role,
         classId: user.classId || null,
         isActive: user.isActive,

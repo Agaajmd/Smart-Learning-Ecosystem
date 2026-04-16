@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils"
 
 interface ImageUploadProps {
   currentImage?: string
-  onImageChange: (imageData: string | null) => void
+  onImageChange: (imageData: string | null) => void | Promise<void>
   onClose?: () => void
   className?: string
   shape?: "circle" | "square"
@@ -28,6 +28,7 @@ export function ImageUpload({
   const [preview, setPreview] = useState<string | null>(currentImage || null)
   const [isDragging, setIsDragging] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const sizeClasses = {
@@ -87,12 +88,20 @@ export function ImageUpload({
     }
   }
 
-  const handleConfirm = () => {
-    onImageChange(preview)
-    onClose?.()
+  const handleConfirm = async () => {
+    if (!preview || isSubmitting) return
+
+    setIsSubmitting(true)
+    try {
+      await onImageChange(preview)
+      onClose?.()
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleCancel = () => {
+    if (isSubmitting) return
     setPreview(currentImage || null)
     onClose?.()
   }
@@ -191,6 +200,7 @@ export function ImageUpload({
             variant="secondary"
             className="flex-1 justify-center"
             onClick={handleCancel}
+            disabled={isSubmitting}
           >
             <X className="w-4 h-4 mr-2" />
             Batal
@@ -198,10 +208,10 @@ export function ImageUpload({
           <GlassButton
             className="flex-1 justify-center"
             onClick={handleConfirm}
-            disabled={!preview}
+            disabled={!preview || isSubmitting}
           >
             <Check className="w-4 h-4 mr-2" />
-            Simpan
+            {isSubmitting ? "Mengganti..." : "Ganti Foto"}
           </GlassButton>
         </div>
       )}
@@ -219,7 +229,7 @@ interface ImageUploadModalProps {
   isOpen: boolean
   onClose: () => void
   currentImage?: string
-  onSave: (imageData: string | null) => void
+  onSave: (imageData: string | null) => void | Promise<void>
   title?: string
 }
 
@@ -230,8 +240,8 @@ export function ImageUploadModal({
   onSave,
   title = "Upload Foto Profil",
 }: ImageUploadModalProps) {
-  const handleImageChange = (imageData: string | null) => {
-    onSave(imageData)
+  const handleImageChange = async (imageData: string | null) => {
+    await onSave(imageData)
   }
 
   if (!isOpen) return null
@@ -240,7 +250,7 @@ export function ImageUploadModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-transparent"
         onClick={onClose}
       />
 

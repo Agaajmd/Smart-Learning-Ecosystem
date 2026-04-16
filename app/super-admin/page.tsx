@@ -19,6 +19,7 @@ import {
   Target,
   BarChart3,
   PieChart,
+  SlidersHorizontal,
   Calendar,
   Bell,
   ChevronRight,
@@ -93,6 +94,7 @@ export default function SuperAdminDashboard() {
   const menuItems = [
     { href: "/super-admin/finance", icon: BarChart3, label: "Keuangan", description: "Kelola keuangan sekolah", color: "bg-emerald-500" },
     { href: "/super-admin/staff", icon: Users, label: "Manajemen Staff", description: "Kelola staff, admin, dan pengaturan akses", color: "bg-blue-500" },
+    { href: "/super-admin/features", icon: SlidersHorizontal, label: "Manajemen Fitur", description: "Aktifkan/nonaktifkan page lintas role", color: "bg-purple-500" },
   ]
 
   if (!superAdmin) {

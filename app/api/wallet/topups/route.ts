@@ -6,7 +6,7 @@ import {
 } from "@/lib/server/google-sheets-wallet-topups"
 import { getSessionUser } from "@/lib/server/session-user"
 import { logAudit } from "@/lib/server/audit-log"
-import { getDbWalletTopups, setDbWalletTopups } from "@/lib/server/persistent-store"
+import { getDbOrders, getDbWalletTopups, setDbWalletTopups } from "@/lib/server/persistent-store"
 import {
   getSchoolWalletMethodMeta,
   SCHOOL_WALLET_QRIS_IMAGE_PATH,
@@ -14,6 +14,8 @@ import {
   SCHOOL_WALLET_TOPUP_METHODS,
 } from "@/lib/wallet-topup"
 import type { WalletTopup, WalletTopupMethod } from "@/lib/data-model"
+import { createDbMediaAssetFromDataUrl } from "@/lib/server/google-sheets-media-assets"
+import { normalizeDriveMediaUrl } from "@/lib/google-drive"
 
 const ENABLED_ROLES = new Set(["STUDENT", "EMPLOYEE", "PARENT", "SUPER_ADMIN"])
 
@@ -28,7 +30,7 @@ function toModel(item: WalletTopupRecord): WalletTopup {
     destinationAccount: item.destinationAccount,
     destinationName: item.destinationName,
     proofReference: item.proofReference,
-    proofUrl: item.proofUrl,
+    proofUrl: normalizeDriveMediaUrl(item.proofUrl),
     status: item.status,
     requestedAt: item.requestedAt,
     processedAt: item.processedAt,
@@ -43,6 +45,24 @@ function sortByRequestedAtDesc<T extends { requestedAt?: string }>(items: T[]) {
 
 function loadWalletTopupsFromStore(): WalletTopup[] {
   return getDbWalletTopups()
+}
+
+async function normalizeTopupProofUrl(input: unknown, userId: string) {
+  const source = String(input || "").trim()
+  if (!source) return undefined
+
+  if (!source.startsWith("data:")) {
+    throw new Error("Bukti topup harus diupload dari aplikasi.")
+  }
+
+  const media = await createDbMediaAssetFromDataUrl({
+    dataUrl: source,
+    ownerType: "wallet_topup_proof",
+    ownerId: userId,
+    originalFileName: `topup-proof-${userId}-${Date.now()}.png`,
+  })
+
+  return media.url
 }
 
 export async function GET() {
@@ -63,9 +83,15 @@ export async function GET() {
     allTopups.filter((item) => item.userId === sessionUser.id),
   )
 
-  const walletBalance = userTopups
+  const approvedAmount = userTopups
     .filter((item) => item.status === "APPROVED")
     .reduce((acc, item) => acc + Number(item.amount || 0), 0)
+
+  const spentAmount = getDbOrders()
+    .filter((order) => order.customerId === sessionUser.id && order.status !== "CANCELLED")
+    .reduce((acc, order) => acc + Number(order.totalAmount || 0), 0)
+
+  const walletBalance = Math.max(0, approvedAmount - spentAmount)
 
   const pendingAmount = userTopups
     .filter((item) => item.status === "PENDING")
@@ -76,6 +102,8 @@ export async function GET() {
     qrisImagePath: SCHOOL_WALLET_QRIS_IMAGE_PATH,
     topups: userTopups,
     walletBalance,
+    approvedAmount,
+    spentAmount,
     pendingAmount,
   })
 }
@@ -94,7 +122,7 @@ export async function POST(request: Request) {
   const amount = Number(body.amount || 0)
   const method = String(body.method || "") as WalletTopupMethod
   const proofReference = String(body.proofReference || "").trim() || undefined
-  const proofUrl = String(body.proofUrl || "").trim() || undefined
+  let proofUrl: string | undefined
 
   if (!Number.isFinite(amount) || amount <= 0) {
     return NextResponse.json({ error: "Nominal topup tidak valid" }, { status: 400 })
@@ -111,6 +139,19 @@ export async function POST(request: Request) {
   const methodMeta = getSchoolWalletMethodMeta(method)
   if (!methodMeta) {
     return NextResponse.json({ error: "Metode topup tidak ditemukan" }, { status: 400 })
+  }
+
+  try {
+    proofUrl = await normalizeTopupProofUrl(body.proofUrl, sessionUser.id)
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Gagal memproses bukti topup" },
+      { status: 400 },
+    )
+  }
+
+  if (!proofUrl) {
+    return NextResponse.json({ error: "Bukti transfer wajib diupload" }, { status: 400 })
   }
 
   let next: WalletTopup
@@ -140,7 +181,7 @@ export async function POST(request: Request) {
       destinationAccount: methodMeta.accountNumber,
       destinationName: methodMeta.accountName,
       proofReference,
-      proofUrl,
+      proofUrl: normalizeDriveMediaUrl(proofUrl),
       status: "PENDING",
       requestedAt: nowIso,
     }

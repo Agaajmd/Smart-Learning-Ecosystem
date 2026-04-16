@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     phone,
     role: "STUDENT",
     classId: normalizedClassId,
-    avatar: "/placeholder-user.jpg",
+    avatar: "",
   })
 
   const next = {

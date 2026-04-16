@@ -157,7 +157,7 @@ export async function POST(request: Request) {
     phone,
     subject: type === "teacher" ? subject : undefined,
     role: type === "teacher" ? "EMPLOYEE" : "ADMIN",
-    avatar: "/placeholder-user.jpg",
+    avatar: "",
   })
 
   if (type === "teacher") {

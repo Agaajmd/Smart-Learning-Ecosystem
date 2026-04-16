@@ -8,6 +8,7 @@ import { GlassCard } from "@/components/molecules/glass-card"
 import { GlassModal } from "@/components/molecules/glass-modal"
 import { GlassButton } from "@/components/atoms/glass-button"
 import { GlassInput } from "@/components/atoms/glass-input"
+import { ImageUploadModal } from "@/components/molecules/image-upload"
 import { 
   ArrowLeft,
   Mail,
@@ -22,11 +23,21 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 
 type Owner = { id: string; name: string; email: string; phone: string; avatar: string; isActive: boolean }
-type Canteen = { id: string; name: string; description: string; image: string; rating: number; totalOrders: number }
+type Canteen = {
+  id: string
+  name: string
+  description: string
+  image: string
+  rating: number
+  totalOrders: number
+  isOpen: boolean
+}
 
 export default function CanteenOwnerProfilePage() {
   const [owner, setOwner] = useState<Owner | null>(null)
   const [canteen, setCanteen] = useState<Canteen | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showAvatarModal, setShowAvatarModal] = useState(false)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
@@ -35,40 +46,91 @@ export default function CanteenOwnerProfilePage() {
     name: "",
     email: "",
     phone: "",
+    password: "",
     canteenName: "",
     canteenDescription: "",
+    canteenImage: "",
+    canteenIsOpen: true,
   })
 
   useEffect(() => {
     const load = async () => {
-      const sessionRes = await fetch("/api/auth/session", { cache: "no-store" })
-      const session = sessionRes.ok ? await sessionRes.json() : null
-      const ownerId = session?.user?.id || ""
+      try {
+        setLoadError(null)
+        const [ownerRes, dashboardRes] = await Promise.all([
+          fetch("/api/canteen-owner/profile", { cache: "no-store" }),
+          fetch("/api/dashboard/canteen-owner", { cache: "no-store" }),
+        ])
 
-      const [ownerRes, dashboardRes] = await Promise.all([
-        fetch(`/api/canteen-owner/profile${ownerId ? `?ownerId=${ownerId}` : ""}`, { cache: "no-store" }),
-        fetch(`/api/dashboard/canteen-owner${ownerId ? `?ownerId=${ownerId}` : ""}`, { cache: "no-store" }),
-      ])
+        let resolvedOwner: Owner | null = null
 
-      if (ownerRes.ok) {
-        const ownerData = await ownerRes.json()
-        if (ownerData.owner) {
-          setOwner(ownerData.owner)
-          const canteenName = String(ownerData.owner.canteenName || "")
-          const canteenDescription = String(ownerData.owner.canteenDescription || "")
-          setEditForm({
-            name: ownerData.owner.name || "",
-            email: ownerData.owner.email || "",
-            phone: ownerData.owner.phone || "",
-            canteenName,
-            canteenDescription,
-          })
+        if (ownerRes.ok) {
+          const ownerData = await ownerRes.json()
+          if (ownerData.owner) {
+            const profileOwner: Owner = {
+              id: String(ownerData.owner.id || ""),
+              name: String(ownerData.owner.name || ""),
+              email: String(ownerData.owner.email || ""),
+              phone: String(ownerData.owner.phone || ""),
+              avatar: String(ownerData.owner.avatar || "/placeholder-user.jpg"),
+              isActive: Boolean(ownerData.owner.isActive),
+            }
+
+            resolvedOwner = profileOwner
+            setOwner(profileOwner)
+            const canteenName = String(ownerData.owner.canteenName || "")
+            const canteenDescription = String(ownerData.owner.canteenDescription || "")
+            const canteenImage = String(ownerData.owner.canteenImage || ownerData.canteen?.image || "")
+            const canteenIsOpen = Boolean(ownerData.owner.canteenIsOpen ?? ownerData.canteen?.isOpen)
+            setEditForm({
+              name: profileOwner.name,
+              email: profileOwner.email,
+              phone: profileOwner.phone,
+              password: "",
+              canteenName,
+              canteenDescription,
+              canteenImage,
+              canteenIsOpen,
+            })
+            if (ownerData.canteen) {
+              setCanteen(ownerData.canteen)
+            }
+          }
+        } else {
+          const payload = await ownerRes.json().catch(() => ({}))
+          setLoadError(String(payload?.error || "Gagal memuat profil owner"))
         }
-      }
 
-      if (dashboardRes.ok) {
-        const dashboardData = await dashboardRes.json()
-        setCanteen(dashboardData.canteen || null)
+        if (dashboardRes.ok) {
+          const dashboardData = await dashboardRes.json()
+          if (dashboardData.owner && !resolvedOwner) {
+            const dashboardOwner: Owner = {
+              id: String(dashboardData.owner.id || ""),
+              name: String(dashboardData.owner.name || "Pemilik Kantin"),
+              email: String(dashboardData.owner.email || ""),
+              phone: String(dashboardData.owner.phone || ""),
+              avatar: String(dashboardData.owner.avatar || "/placeholder-user.jpg"),
+              isActive: dashboardData.owner.isActive !== false,
+            }
+            setOwner(dashboardOwner)
+            setEditForm((prev) => ({
+              ...prev,
+              name: dashboardOwner.name,
+              email: dashboardOwner.email,
+              phone: dashboardOwner.phone,
+              password: "",
+              canteenName: prev.canteenName || String(dashboardData.owner.canteenName || ""),
+            }))
+          }
+          setCanteen((prev) => prev || dashboardData.canteen || null)
+        } else if (!resolvedOwner) {
+          const payload = await dashboardRes.json().catch(() => ({}))
+          setLoadError(String(payload?.error || "Gagal memuat data owner"))
+        }
+      } catch {
+        setLoadError("Gagal memuat profil owner")
+      } finally {
+        setIsLoading(false)
       }
     }
     load().catch(() => {})
@@ -77,6 +139,7 @@ export default function CanteenOwnerProfilePage() {
   const handleSaveProfile = async () => {
     if (!owner || isSavingProfile) return
     setIsSavingProfile(true)
+    const password = editForm.password.trim()
     try {
       const res = await fetch("/api/canteen-owner/profile", {
         method: "PATCH",
@@ -88,80 +151,118 @@ export default function CanteenOwnerProfilePage() {
           phone: editForm.phone,
           canteenName: editForm.canteenName,
           canteenDescription: editForm.canteenDescription,
+          canteenImage: editForm.canteenImage,
+          canteenIsOpen: editForm.canteenIsOpen,
           avatar: owner.avatar,
+          ...(password ? { password } : {}),
         }),
       })
-      if (!res.ok) throw new Error()
 
-      setOwner((prev) =>
-        prev
-          ? {
-              ...prev,
-              name: editForm.name,
-              email: editForm.email,
-              phone: editForm.phone,
-            }
-          : prev,
-      )
-      setCanteen((prev) =>
-        prev
-          ? {
-              ...prev,
-              name: editForm.canteenName,
-              description: editForm.canteenDescription,
-            }
-          : prev,
-      )
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}))
+        throw new Error(String(payload?.error || "Gagal memperbarui profil"))
+      }
+
+      const data = await res.json()
+      if (data.owner) {
+        setOwner((prev) =>
+          prev
+            ? {
+                ...prev,
+                name: data.owner.name,
+                email: data.owner.email,
+                phone: data.owner.phone,
+              }
+            : prev,
+        )
+      }
+      if (data.canteen) {
+        setCanteen(data.canteen)
+      } else {
+        setCanteen((prev) =>
+          prev
+            ? {
+                ...prev,
+                name: editForm.canteenName,
+                description: editForm.canteenDescription,
+                image: editForm.canteenImage || prev.image,
+                isOpen: editForm.canteenIsOpen,
+              }
+            : prev,
+        )
+      }
       setShowEditModal(false)
       toast.success("Profil berhasil diperbarui")
-    } catch {
-      toast.error("Gagal memperbarui profil")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal memperbarui profil")
     } finally {
       setIsSavingProfile(false)
     }
   }
 
-  if (!owner) {
+  if (isLoading) {
     return <RouteLoading />
   }
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !owner || isSavingAvatar) return
+  if (!owner) {
+    return (
+      <DashboardLayout role="CANTEEN_OWNER" userName="Pemilik Kantin" userAvatar="/placeholder-user.jpg">
+        <div className="max-w-2xl mx-auto px-1">
+          <GlassCard className="p-6 border border-amber-200 bg-amber-50 text-amber-700">
+            <p className="font-semibold">Data owner belum tersedia</p>
+            <p className="text-sm mt-2">{loadError || "Hubungi admin untuk menghubungkan akun owner dengan kantin."}</p>
+          </GlassCard>
+        </div>
+      </DashboardLayout>
+    )
+  }
 
-    setIsSavingAvatar(true)
+  const handleCanteenImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
     const reader = new FileReader()
-    reader.onload = async (event) => {
-      const avatar = String(event.target?.result || "")
-      if (!avatar) {
-        setIsSavingAvatar(false)
-        return
-      }
-
-      try {
-        const res = await fetch("/api/canteen-owner/profile", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id: owner.id,
-            name: owner.name,
-            email: owner.email,
-            phone: owner.phone,
-            avatar,
-          }),
-        })
-        if (!res.ok) throw new Error()
-
-        setOwner((prev) => (prev ? { ...prev, avatar } : prev))
-        setShowAvatarModal(false)
-        toast.success("Foto profil berhasil diperbarui")
-      } catch {
-        toast.error("Gagal memperbarui foto profil")
-      } finally {
-        setIsSavingAvatar(false)
-      }
+    reader.onload = (loadEvent) => {
+      const result = String(loadEvent.target?.result || "")
+      if (!result) return
+      setEditForm((prev) => ({ ...prev, canteenImage: result }))
     }
     reader.readAsDataURL(file)
+  }
+
+  const handleAvatarSave = async (imageData: string | null) => {
+    if (!imageData || !owner || isSavingAvatar) return
+
+    setIsSavingAvatar(true)
+    try {
+      const res = await fetch("/api/canteen-owner/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: owner.id,
+          name: owner.name,
+          email: owner.email,
+          phone: owner.phone,
+          avatar: imageData,
+        }),
+      })
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}))
+        throw new Error(String(payload?.error || "Gagal memperbarui foto profil"))
+      }
+
+      const data = await res.json().catch(() => ({}))
+      const nextAvatar = String(data?.owner?.avatar || imageData)
+
+      setOwner((prev) => (prev ? { ...prev, avatar: nextAvatar } : prev))
+      setShowAvatarModal(false)
+      toast.success("Foto profil berhasil diperbarui")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal memperbarui foto profil")
+      throw error
+    } finally {
+      setIsSavingAvatar(false)
+    }
   }
 
   return (
@@ -265,6 +366,15 @@ export default function CanteenOwnerProfilePage() {
                 <p className="text-xs text-slate-500 mt-1">Total Order</p>
               </div>
             </div>
+
+            <div className="pt-1">
+              <span className={cn(
+                "inline-flex px-3 py-1 rounded-full text-xs font-medium",
+                canteen.isOpen ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+              )}>
+                {canteen.isOpen ? "Kantin Buka" : "Kantin Tutup"}
+              </span>
+            </div>
           </GlassCard>
         )}
 
@@ -275,8 +385,11 @@ export default function CanteenOwnerProfilePage() {
               name: owner.name || "",
               email: owner.email || "",
               phone: owner.phone || "",
+              password: "",
               canteenName: canteen?.name || "",
               canteenDescription: canteen?.description || "",
+              canteenImage: canteen?.image || "",
+              canteenIsOpen: canteen?.isOpen ?? true,
             })
             setShowEditModal(true)
           }}
@@ -301,12 +414,45 @@ export default function CanteenOwnerProfilePage() {
             <GlassInput value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
           </div>
           <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Password Baru (Opsional)</label>
+            <GlassInput type="password" value={editForm.password} onChange={(e) => setEditForm({ ...editForm, password: e.target.value })} />
+            <p className="text-xs text-slate-500 mt-1">Minimal 6 karakter</p>
+          </div>
+          <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Nama Kantin</label>
             <GlassInput value={editForm.canteenName} onChange={(e) => setEditForm({ ...editForm, canteenName: e.target.value })} />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Deskripsi Kantin</label>
             <GlassInput value={editForm.canteenDescription} onChange={(e) => setEditForm({ ...editForm, canteenDescription: e.target.value })} />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Foto Kantin</label>
+            <label className="block border border-dashed border-slate-300 rounded-xl p-4 text-center cursor-pointer hover:border-orange-300 hover:bg-orange-50/40 transition-colors">
+              <input type="file" className="hidden" accept="image/*" onChange={handleCanteenImageChange} />
+              <p className="text-sm text-slate-600">Upload foto kantin</p>
+            </label>
+            {editForm.canteenImage ? (
+              <img src={editForm.canteenImage} alt="Preview kantin" className="mt-3 w-full h-28 object-cover rounded-xl border border-slate-200" />
+            ) : null}
+          </div>
+
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-slate-700">Status Operasional</label>
+            <button
+              type="button"
+              onClick={() => setEditForm((prev) => ({ ...prev, canteenIsOpen: !prev.canteenIsOpen }))}
+              className={cn(
+                "relative w-12 h-6 rounded-full transition-colors",
+                editForm.canteenIsOpen ? "bg-green-500" : "bg-slate-300"
+              )}
+            >
+              <span className={cn(
+                "absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform",
+                editForm.canteenIsOpen ? "left-6" : "left-0.5"
+              )} />
+            </button>
           </div>
         </div>
 
@@ -320,18 +466,13 @@ export default function CanteenOwnerProfilePage() {
         </div>
       </GlassModal>
 
-      <GlassModal isOpen={showAvatarModal} onClose={() => setShowAvatarModal(false)} title="Ganti Foto Profil" size="sm">
-        <label className="block border-2 border-dashed border-slate-200 rounded-xl p-8 text-center cursor-pointer hover:border-orange-300 hover:bg-orange-50/50 transition-colors">
-          <input type="file" className="hidden" accept="image/*" onChange={handleAvatarChange} />
-          <Camera className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <p className="text-sm text-slate-600 font-medium">Klik untuk pilih foto</p>
-          <p className="text-xs text-slate-400 mt-1">JPG, PNG (maks 5MB)</p>
-        </label>
-
-        <GlassButton variant="secondary" onClick={() => setShowAvatarModal(false)} className="w-full mt-4" disabled={isSavingAvatar}>
-          Batal
-        </GlassButton>
-      </GlassModal>
+      <ImageUploadModal
+        isOpen={showAvatarModal}
+        onClose={() => setShowAvatarModal(false)}
+        onSave={handleAvatarSave}
+        currentImage={owner.avatar}
+        title="Ganti Foto Profil"
+      />
     </DashboardLayout>
   )
 }

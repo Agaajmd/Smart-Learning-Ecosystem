@@ -32,7 +32,7 @@ export async function POST(req: Request) {
       email,
       password,
       role,
-      avatar: "/placeholder-user.jpg",
+      avatar: "",
     })
 
     logAudit({

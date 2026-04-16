@@ -1,6 +1,6 @@
 import "server-only"
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { accessSync, constants, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import type {
   ClassRoom,
@@ -22,6 +22,8 @@ import type {
   StudentPayment,
   WalletTopup,
 } from "@/lib/data-model"
+import type { PageFeatureKey } from "@/lib/page-features"
+import { normalizeDriveMediaUrl, normalizeDriveMediaUrlList } from "@/lib/google-drive"
 
 export interface StudentReport {
   id: string
@@ -50,6 +52,13 @@ export interface AuditLog {
   createdAt: string
 }
 
+export interface PageFeatureSetting {
+  key: PageFeatureKey
+  enabled: boolean
+  updatedAt: string
+  updatedBy?: string
+}
+
 type PersistedDb = {
   orders: Order[]
   products: Product[]
@@ -72,12 +81,59 @@ type PersistedDb = {
   canteens: Canteen[]
   canteenOwners: CanteenOwner[]
   walletTopups: WalletTopup[]
+  pageFeatures: PageFeatureSetting[]
 }
 
-const STORE_DIR = path.join(process.cwd(), ".data")
-const STORE_FILE = path.join(STORE_DIR, "persistent-store.json")
+const STORE_FILE_NAME = "persistent-store.json"
+const DEFAULT_STORE_DIR = path.join(process.cwd(), ".data")
+const SERVERLESS_STORE_DIR = path.join("/tmp", "siakad-data")
 
 let dbCache: PersistedDb | null = null
+let resolvedStoreDir: string | null | undefined
+
+function isServerlessRuntime() {
+  return Boolean(
+    process.env.VERCEL ||
+      process.env.AWS_EXECUTION_ENV ||
+      process.env.AWS_LAMBDA_FUNCTION_NAME ||
+      process.env.LAMBDA_TASK_ROOT,
+  )
+}
+
+function resolveStoreDir() {
+  if (resolvedStoreDir !== undefined) {
+    return resolvedStoreDir
+  }
+
+  const envStoreDir = String(process.env.PERSISTENT_STORE_DIR || "").trim()
+  const candidates = [
+    envStoreDir,
+    isServerlessRuntime() ? SERVERLESS_STORE_DIR : "",
+    DEFAULT_STORE_DIR,
+  ]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+
+  for (const candidate of [...new Set(candidates)]) {
+    try {
+      mkdirSync(candidate, { recursive: true })
+      accessSync(candidate, constants.W_OK)
+      resolvedStoreDir = candidate
+      return resolvedStoreDir
+    } catch {
+      // Try the next candidate directory.
+    }
+  }
+
+  resolvedStoreDir = null
+  return resolvedStoreDir
+}
+
+function resolveStoreFile() {
+  const storeDir = resolveStoreDir()
+  if (!storeDir) return null
+  return path.join(storeDir, STORE_FILE_NAME)
+}
 
 const createEmptyDb = (): PersistedDb => ({
   orders: [],
@@ -101,13 +157,8 @@ const createEmptyDb = (): PersistedDb => ({
   canteens: [],
   canteenOwners: [],
   walletTopups: [],
+  pageFeatures: [],
 })
-
-function ensureStoreDir() {
-  if (!existsSync(STORE_DIR)) {
-    mkdirSync(STORE_DIR, { recursive: true })
-  }
-}
 
 function mergeWithDefaults(raw: Partial<PersistedDb> | null | undefined): PersistedDb {
   const empty = createEmptyDb()
@@ -139,6 +190,7 @@ function mergeWithDefaults(raw: Partial<PersistedDb> | null | undefined): Persis
     canteens: Array.isArray(raw.canteens) ? raw.canteens : empty.canteens,
     canteenOwners: Array.isArray(raw.canteenOwners) ? raw.canteenOwners : empty.canteenOwners,
     walletTopups: Array.isArray(raw.walletTopups) ? raw.walletTopups : empty.walletTopups,
+    pageFeatures: Array.isArray(raw.pageFeatures) ? raw.pageFeatures : empty.pageFeatures,
   }
 }
 
@@ -148,12 +200,13 @@ function loadDb(): PersistedDb {
   }
 
   try {
-    if (!existsSync(STORE_FILE)) {
+    const storeFile = resolveStoreFile()
+    if (!storeFile || !existsSync(storeFile)) {
       dbCache = createEmptyDb()
       return dbCache
     }
 
-    const raw = readFileSync(STORE_FILE, "utf8")
+    const raw = readFileSync(storeFile, "utf8")
     const parsed = JSON.parse(raw) as Partial<PersistedDb>
     dbCache = mergeWithDefaults(parsed)
     return dbCache
@@ -164,9 +217,18 @@ function loadDb(): PersistedDb {
 }
 
 function persistDb(next: PersistedDb) {
-  ensureStoreDir()
   dbCache = next
-  writeFileSync(STORE_FILE, JSON.stringify(next), "utf8")
+
+  const storeFile = resolveStoreFile()
+  if (!storeFile) {
+    return
+  }
+
+  try {
+    writeFileSync(storeFile, JSON.stringify(next), "utf8")
+  } catch {
+    // Keep in-memory cache even when runtime storage is not writable.
+  }
 }
 
 function readCollection<K extends keyof PersistedDb>(key: K): PersistedDb[K] {
@@ -183,12 +245,38 @@ function writeCollection<K extends keyof PersistedDb>(key: K, value: PersistedDb
   persistDb(next)
 }
 
+function sanitizeUserAvatar<T extends { avatar: string }>(item: T): T {
+  return {
+    ...item,
+    avatar: normalizeDriveMediaUrl(item.avatar) || "",
+  }
+}
+
+function sanitizeTaskMedia<T extends { attachmentUrl?: string; attachmentUrls?: string[]; imageUrl?: string; imageUrls?: string[] }>(
+  item: T,
+): T {
+  const attachmentUrls = normalizeDriveMediaUrlList(item.attachmentUrls || (item.attachmentUrl ? [item.attachmentUrl] : []))
+  const imageUrls = normalizeDriveMediaUrlList(item.imageUrls || (item.imageUrl ? [item.imageUrl] : []))
+
+  return {
+    ...item,
+    attachmentUrl: attachmentUrls[0],
+    attachmentUrls,
+    imageUrl: imageUrls[0],
+    imageUrls,
+  }
+}
+
 export const getDbOrders = () => readCollection("orders")
 export const setDbOrders = (orders: Order[]) => {
   writeCollection("orders", orders)
 }
 
-export const getDbProducts = () => readCollection("products")
+export const getDbProducts = () =>
+  readCollection("products").map((item) => ({
+    ...item,
+    image: normalizeDriveMediaUrl(item.image) || "",
+  }))
 export const setDbProducts = (products: Product[]) => {
   writeCollection("products", products)
 }
@@ -215,17 +303,17 @@ export const setDbAuditLogs = (auditLogs: AuditLog[]) => {
   writeCollection("auditLogs", auditLogs)
 }
 
-export const getDbTeachers = () => readCollection("teachers")
+export const getDbTeachers = () => readCollection("teachers").map((item) => sanitizeUserAvatar(item))
 export const setDbTeachers = (teachers: Employee[]) => {
   writeCollection("teachers", teachers)
 }
 
-export const getDbAdmins = () => readCollection("admins")
+export const getDbAdmins = () => readCollection("admins").map((item) => sanitizeUserAvatar(item))
 export const setDbAdmins = (admins: User[]) => {
   writeCollection("admins", admins)
 }
 
-export const getDbSuperAdmins = () => readCollection("superAdmins")
+export const getDbSuperAdmins = () => readCollection("superAdmins").map((item) => sanitizeUserAvatar(item))
 export const setDbSuperAdmins = (superAdmins: User[]) => {
   writeCollection("superAdmins", superAdmins)
 }
@@ -240,12 +328,13 @@ export const setDbPiketSchedules = (piketSchedules: PiketSchedule[]) => {
   writeCollection("piketSchedules", piketSchedules)
 }
 
-export const getDbTasks = () => readCollection("tasks")
+export const getDbTasks = () => readCollection("tasks").map((item) => sanitizeTaskMedia(item))
 export const setDbTasks = (tasks: Task[]) => {
   writeCollection("tasks", tasks)
 }
 
-export const getDbTaskSubmissions = () => readCollection("taskSubmissions")
+export const getDbTaskSubmissions = () =>
+  readCollection("taskSubmissions").map((item) => sanitizeTaskMedia(item))
 export const setDbTaskSubmissions = (taskSubmissions: TaskSubmission[]) => {
   writeCollection("taskSubmissions", taskSubmissions)
 }
@@ -255,32 +344,49 @@ export const setDbClasses = (classes: ClassRoom[]) => {
   writeCollection("classes", classes)
 }
 
-export const getDbStudents = () => readCollection("students")
+export const getDbStudents = () => readCollection("students").map((item) => sanitizeUserAvatar(item))
 export const setDbStudents = (students: Student[]) => {
   writeCollection("students", students)
 }
 
-export const getDbParents = () => readCollection("parents")
+export const getDbParents = () => readCollection("parents").map((item) => sanitizeUserAvatar(item))
 export const setDbParents = (parents: Parent[]) => {
   writeCollection("parents", parents)
 }
 
-export const getDbCanteens = () => readCollection("canteens")
+export const getDbCanteens = () =>
+  readCollection("canteens").map((item) => ({
+    ...item,
+    image: normalizeDriveMediaUrl(item.image) || "",
+  }))
 export const setDbCanteens = (canteens: Canteen[]) => {
   writeCollection("canteens", canteens)
 }
 
-export const getDbCanteenOwners = () => readCollection("canteenOwners")
+export const getDbCanteenOwners = () => readCollection("canteenOwners").map((item) => sanitizeUserAvatar(item))
 export const setDbCanteenOwners = (canteenOwners: CanteenOwner[]) => {
   writeCollection("canteenOwners", canteenOwners)
 }
 
-export const getDbStudentReports = () => readCollection("studentReports")
+export const getDbStudentReports = () =>
+  readCollection("studentReports").map((item) => ({
+    ...item,
+    imageUrl: normalizeDriveMediaUrl(item.imageUrl),
+  }))
 export const setDbStudentReports = (studentReports: StudentReport[]) => {
   writeCollection("studentReports", studentReports)
 }
 
-export const getDbWalletTopups = () => readCollection("walletTopups")
+export const getDbWalletTopups = () =>
+  readCollection("walletTopups").map((item) => ({
+    ...item,
+    proofUrl: normalizeDriveMediaUrl(item.proofUrl),
+  }))
 export const setDbWalletTopups = (walletTopups: WalletTopup[]) => {
   writeCollection("walletTopups", walletTopups)
+}
+
+export const getDbPageFeatures = () => readCollection("pageFeatures")
+export const setDbPageFeatures = (pageFeatures: PageFeatureSetting[]) => {
+  writeCollection("pageFeatures", pageFeatures)
 }

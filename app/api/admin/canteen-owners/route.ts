@@ -123,7 +123,7 @@ export async function POST(request: Request) {
     password,
     role: "CANTEEN_OWNER",
     phone,
-    avatar: "/placeholder-user.jpg",
+    avatar: "",
   })
 
   const canteenId = `can-${Date.now()}`
@@ -144,7 +144,7 @@ export async function POST(request: Request) {
     name: canteenName,
     ownerId: user.id,
     description: canteenDescription,
-    image: "/placeholder.svg?height=200&width=300&query=food+stall",
+    image: "",
     rating: 0,
     totalOrders: 0,
     isOpen: isActive,

@@ -65,7 +65,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     id,
     name: userTarget?.name || "",
     email: userTarget?.email || "",
-    avatar: userTarget?.avatar || "/placeholder-user.jpg",
+    avatar: userTarget?.avatar || "",
     role: "CANTEEN_OWNER" as const,
     canteenId: canteensFromSheet.find((item) => item.ownerId === id)?.id || "",
     canteenName: canteensFromSheet.find((item) => item.ownerId === id)?.name || "",

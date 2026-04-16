@@ -8,7 +8,7 @@ import { GlassModal } from "@/components/molecules/glass-modal"
 import { GlassInput } from "@/components/atoms/glass-input"
 import { ImageUploadModal } from "@/components/molecules/image-upload"
 import { RouteLoading } from "@/components/templates/route-loading"
-import { Mail, BookOpen, Star, Users, Calendar, Award, Edit, Clock, TrendingUp, Camera, Save, X } from "lucide-react"
+import { Mail, BookOpen, Star, Users, Calendar, Award, Edit, Clock, Camera, Save, X } from "lucide-react"
 
 type Employee = {
   id: string
@@ -51,7 +51,7 @@ export default function EmployeeProfile() {
   const [showEditModal, setShowEditModal] = useState(false)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [isSavingAvatar, setIsSavingAvatar] = useState(false)
-  const [editForm, setEditForm] = useState({ name: "", email: "", subject: "" })
+  const [editForm, setEditForm] = useState({ name: "", email: "", subject: "", password: "" })
 
   useEffect(() => {
     const load = async () => {
@@ -78,7 +78,12 @@ export default function EmployeeProfile() {
         classesCount: 0,
       }
       setEmployee(nextEmployee)
-      setEditForm({ name: nextEmployee.name || "", email: nextEmployee.email || "", subject: nextEmployee.subject || "" })
+      setEditForm({
+        name: nextEmployee.name || "",
+        email: nextEmployee.email || "",
+        subject: nextEmployee.subject || "",
+        password: "",
+      })
       setAllSchedules(Array.isArray(contextData.schedules) ? contextData.schedules : [])
       setClasses(Array.isArray(contextData.classes) ? contextData.classes : [])
       setIsLoading(false)
@@ -101,13 +106,14 @@ export default function EmployeeProfile() {
   }
 
   const handleEditProfile = () => {
-    setEditForm({ name: employee.name, email: employee.email, subject: employee.subject })
+    setEditForm({ name: employee.name, email: employee.email, subject: employee.subject, password: "" })
     setShowEditModal(true)
   }
 
   const handleSaveProfile = async () => {
     if (!employee.id || isSavingProfile) return
     setIsSavingProfile(true)
+    const password = editForm.password.trim()
     try {
       const res = await fetch("/api/employee/profile", {
         method: "PATCH",
@@ -118,15 +124,19 @@ export default function EmployeeProfile() {
           email: editForm.email,
           subject: editForm.subject,
           avatar: employee.avatar,
+          ...(password ? { password } : {}),
         }),
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}))
+        throw new Error(String(payload?.error || "Gagal memperbarui profil"))
+      }
 
       setEmployee((prev) => ({ ...prev, name: editForm.name, email: editForm.email, subject: editForm.subject }))
       setShowEditModal(false)
       toast.success("Profil berhasil diperbarui", { description: "Perubahan telah disimpan" })
-    } catch {
-      toast.error("Gagal memperbarui profil")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal memperbarui profil")
     } finally {
       setIsSavingProfile(false)
     }
@@ -151,13 +161,19 @@ export default function EmployeeProfile() {
           avatar: imageData,
         }),
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}))
+        throw new Error(String(payload?.error || "Gagal memperbarui foto profil"))
+      }
 
-      setEmployee((prev) => ({ ...prev, avatar: imageData }))
+      const data = await res.json().catch(() => ({}))
+      const nextAvatar = String(data?.employee?.avatar || imageData)
+
+      setEmployee((prev) => ({ ...prev, avatar: nextAvatar }))
       toast.success("Foto profil berhasil diperbarui", { description: "Perubahan telah disimpan" })
       setShowAvatarModal(false)
-    } catch {
-      toast.error("Gagal memperbarui foto profil")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal memperbarui foto profil")
     } finally {
       setIsSavingAvatar(false)
     }
@@ -179,11 +195,10 @@ export default function EmployeeProfile() {
           </div>
         </GlassCard>
 
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <GlassCard className="text-center py-4"><Star className="w-6 h-6 mx-auto mb-1 text-yellow-500" /><p className="text-xl font-bold text-slate-800">{employee.rating}</p><p className="text-xs text-slate-500">Rating</p></GlassCard>
           <GlassCard className="text-center py-4"><Users className="w-6 h-6 mx-auto mb-1 text-blue-500" /><p className="text-xl font-bold text-slate-800">{uniqueClasses.length}</p><p className="text-xs text-slate-500">Classes</p></GlassCard>
           <GlassCard className="text-center py-4"><Clock className="w-6 h-6 mx-auto mb-1 text-purple-500" /><p className="text-xl font-bold text-slate-800">{totalHoursPerWeek}h</p><p className="text-xs text-slate-500">Weekly</p></GlassCard>
-          <GlassCard className="text-center py-4"><TrendingUp className="w-6 h-6 mx-auto mb-1 text-green-500" /><p className="text-xl font-bold text-slate-800">95%</p><p className="text-xs text-slate-500">Attend</p></GlassCard>
         </div>
 
         <GlassCard>
@@ -210,6 +225,11 @@ export default function EmployeeProfile() {
           <div><label className="text-sm font-medium text-slate-700 mb-1.5 block">Nama Lengkap</label><GlassInput value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></div>
           <div><label className="text-sm font-medium text-slate-700 mb-1.5 block">Email</label><GlassInput type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} /></div>
           <div><label className="text-sm font-medium text-slate-700 mb-1.5 block">Mata Pelajaran</label><GlassInput value={editForm.subject} onChange={(e) => setEditForm({ ...editForm, subject: e.target.value })} /></div>
+          <div>
+            <label className="text-sm font-medium text-slate-700 mb-1.5 block">Password Baru (Opsional)</label>
+            <GlassInput type="password" value={editForm.password} onChange={(e) => setEditForm({ ...editForm, password: e.target.value })} />
+            <p className="text-xs text-slate-500 mt-1">Minimal 6 karakter</p>
+          </div>
           <div className="flex gap-3 pt-3 border-t border-slate-100">
             <GlassButton variant="secondary" className="flex-1 justify-center" onClick={() => setShowEditModal(false)}><X className="w-4 h-4 mr-2" />Batal</GlassButton>
             <GlassButton className="flex-1 justify-center" onClick={handleSaveProfile} disabled={isSavingProfile}><Save className="w-4 h-4 mr-2" />{isSavingProfile ? "Menyimpan..." : "Simpan"}</GlassButton>
