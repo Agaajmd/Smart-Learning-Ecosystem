@@ -60,6 +60,10 @@ function normalizeWhatsappNumber(value: string) {
   return value.trim().replace(/[\s-]/g, "")
 }
 
+function encodeStaffId(id: string) {
+  return encodeURIComponent(String(id || ""))
+}
+
 export default function SuperAdminStaff() {
   const router = useRouter()
   const [superAdmin, setSuperAdmin] = useState<User | null>(null)
@@ -264,7 +268,7 @@ export default function SuperAdminStaff() {
         subject: editStaff.subject.trim(),
       }
 
-      const res = await fetch(`/api/super-admin/staff/${editStaff.id}`, {
+      const res = await fetch(`/api/super-admin/staff/${encodeStaffId(editStaff.id)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -305,7 +309,7 @@ export default function SuperAdminStaff() {
     if (!staffToDelete) return
     setIsMutating(true)
     try {
-      const res = await fetch(`/api/super-admin/staff/${staffToDelete.id}`, { method: "DELETE" })
+      const res = await fetch(`/api/super-admin/staff/${encodeStaffId(staffToDelete.id)}`, { method: "DELETE" })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || "Gagal menghapus staff")
 
@@ -453,7 +457,7 @@ export default function SuperAdminStaff() {
                   key={staff.id}
                   className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors gap-3 ${teacher ? "cursor-pointer" : ""}`}
                   onClick={() => {
-                    if (teacher) router.push(`/super-admin/staff/${staff.id}`)
+                    if (teacher) router.push(`/super-admin/staff/${encodeStaffId(staff.id)}`)
                   }}
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -505,7 +509,7 @@ export default function SuperAdminStaff() {
 
                       <div className="absolute right-0 top-full mt-2 w-56 py-2 bg-white border border-slate-200 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
                         {teacher && (
-                          <button onClick={() => router.push(`/super-admin/staff/${staff.id}`)} className="flex items-center gap-2 w-full px-3 sm:px-4 py-2 text-xs sm:text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                          <button onClick={() => router.push(`/super-admin/staff/${encodeStaffId(staff.id)}`)} className="flex items-center gap-2 w-full px-3 sm:px-4 py-2 text-xs sm:text-sm text-slate-700 hover:bg-slate-50 transition-colors">
                             <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                             Lihat Detail
                           </button>

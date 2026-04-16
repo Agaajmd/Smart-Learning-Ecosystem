@@ -34,9 +34,10 @@ export default function StaffDetailClient({ id }: ClientPageProps) {
 
   useEffect(() => {
     const load = async () => {
+      const encodedId = encodeURIComponent(id)
       try {
         const [staffRes, baseRes] = await Promise.all([
-          fetch(`/api/super-admin/staff/${id}`, { cache: "no-store" }),
+          fetch(`/api/super-admin/staff/${encodedId}`, { cache: "no-store" }),
           fetch("/api/super-admin/staff", { cache: "no-store" }),
         ])
 
