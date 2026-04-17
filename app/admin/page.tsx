@@ -16,10 +16,15 @@ import {
   Activity,
   QrCode,
   Users,
-  Wallet
+  Wallet,
+  XCircle,
 } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
+import {
+  isPageFeatureEnabled,
+  type PageFeatureStateMap,
+} from "@/lib/page-features"
 
 type AdminUser = { name: string; avatar: string }
 type ReportItem = { id: string; type: string; title: string; status: string; date: string; reporter: string; priority: string }
@@ -32,18 +37,29 @@ export default function AdminDashboard() {
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [selectedReport, setSelectedReport] = useState<ReportItem | null>(null)
   const [activeTab, setActiveTab] = useState<"reports" | "inventory">("reports")
+  const [featureState, setFeatureState] = useState<PageFeatureStateMap>({})
 
   useEffect(() => {
     let active = true
     const load = async () => {
       try {
-        const res = await fetch("/api/dashboard/admin", { cache: "no-store" })
+        const [res, featureRes] = await Promise.all([
+          fetch("/api/dashboard/admin", { cache: "no-store" }),
+          fetch("/api/page-features", { cache: "no-store" }),
+        ])
         if (!res.ok) return
         const data = await res.json()
         if (!active) return
         if (data.admin) setAdmin(data.admin)
         if (Array.isArray(data.reports)) setReports(data.reports)
         if (Array.isArray(data.inventory)) setInventory(data.inventory)
+
+        if (featureRes.ok) {
+          const featurePayload = await featureRes.json()
+          if (featurePayload?.state && typeof featurePayload.state === "object") {
+            setFeatureState(featurePayload.state as PageFeatureStateMap)
+          }
+        }
       } catch {
         // Keep current state when API is unavailable.
       } finally {
@@ -72,10 +88,19 @@ export default function AdminDashboard() {
     { icon: PackageCheck, label: "Total Aset", value: inventory.reduce((acc, i) => acc + i.total, 0), color: "text-purple-500", bgColor: "bg-purple-50" },
   ]
 
+  const walletTopupFeatureEnabled = isPageFeatureEnabled("admin_wallet_topups", featureState)
+
   const quickActions = [
     { href: "/admin/scan", icon: QrCode, label: "Scan QR Aset", description: "Scan dan laporkan masalah aset", color: "bg-blue-500" },
     { href: "/admin/users", icon: Users, label: "Data Pengguna", description: "Lihat dan kelola data pengguna", color: "bg-emerald-500" },
-    { href: "/admin/wallet-topups", icon: Wallet, label: "Konfirmasi Topup", description: "Verifikasi permintaan topup dompet", color: "bg-amber-500" },
+    {
+      href: "/admin/wallet-topups",
+      icon: Wallet,
+      label: "Konfirmasi Topup",
+      description: "Verifikasi permintaan topup dompet",
+      color: "bg-amber-500",
+      disabled: !walletTopupFeatureEnabled,
+    },
   ]
 
   const getStatusColor = (status: string) => {
@@ -113,12 +138,40 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleUpdateStatus = (reportId: string, newStatus: string) => {
-    setReports(reports.map(r => r.id === reportId ? { ...r, status: newStatus } : r))
-    setSelectedReport(null)
-    toast.success("Status laporan diperbarui", {
-      description: `Laporan telah diubah ke status "${getStatusLabel(newStatus)}"`,
-    })
+  const handleUpdateStatus = async (reportId: string, newStatus: string) => {
+    try {
+      const res = await fetch("/api/admin/asset-reports", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: reportId,
+          status: newStatus,
+        }),
+      })
+
+      const payload = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(String(payload?.error || "Gagal memperbarui status laporan"))
+      }
+
+      setReports((prev) =>
+        prev.map((item) =>
+          item.id === reportId
+            ? {
+                ...item,
+                status: newStatus,
+                priority: newStatus === "pending" ? "high" : newStatus === "in-progress" ? "medium" : "low",
+              }
+            : item,
+        ),
+      )
+      setSelectedReport(null)
+      toast.success("Status laporan diperbarui", {
+        description: `Laporan telah diubah ke status "${getStatusLabel(newStatus)}"`,
+      })
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal memperbarui status laporan")
+    }
   }
 
   return (
@@ -155,6 +208,28 @@ export default function AdminDashboard() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {quickActions.map((action) => {
             const Icon = action.icon
+            const isDisabled = Boolean((action as { disabled?: boolean }).disabled)
+
+            if (isDisabled) {
+              return (
+                <div
+                  key={action.href}
+                  className="flex items-center gap-4 p-4 bg-slate-100 border border-dashed border-slate-300 rounded-2xl text-slate-400"
+                >
+                  <div className="p-3 bg-slate-300 rounded-xl">
+                    <Icon className="w-6 h-6 text-slate-500" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-slate-600 flex items-center gap-2">
+                      {action.label}
+                      <XCircle className="w-4 h-4 text-rose-500" />
+                    </h3>
+                    <p className="text-sm text-slate-500">Dinonaktifkan oleh Kepala Sekolah</p>
+                  </div>
+                </div>
+              )
+            }
+
             return (
               <Link key={action.href} href={action.href}>
                 <div className="flex items-center gap-4 p-4 bg-white border border-slate-200 rounded-2xl hover:border-slate-300 hover:shadow-md transition-all duration-200">

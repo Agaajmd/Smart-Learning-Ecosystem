@@ -26,6 +26,11 @@ import {
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { RouteLoading } from "@/components/templates/route-loading"
+import {
+  isPageFeatureEnabled,
+  SCHOOL_WALLET_FEATURE_KEY,
+  type PageFeatureStateMap,
+} from "@/lib/page-features"
 
 export default function ParentDashboard() {
   const [parent, setParent] = useState<any>(null)
@@ -38,6 +43,7 @@ export default function ParentDashboard() {
   const [activityPoints, setActivityPoints] = useState<any[]>([])
   const [grades, setGrades] = useState<any[]>([])
   const [childClass, setChildClass] = useState<any>(null)
+  const [featureState, setFeatureState] = useState<PageFeatureStateMap>({})
 
   useEffect(() => {
     let active = true
@@ -86,6 +92,29 @@ export default function ParentDashboard() {
       active = false
     }
   }, [selectedChild?.id])
+
+  useEffect(() => {
+    let active = true
+
+    const loadFeatureState = async () => {
+      try {
+        const res = await fetch("/api/page-features", { cache: "no-store" })
+        if (!res.ok || !active) return
+        const payload = await res.json()
+        if (payload?.state && typeof payload.state === "object") {
+          setFeatureState(payload.state as PageFeatureStateMap)
+        }
+      } catch {
+        // Keep wallet feature enabled by default when config endpoint is unavailable.
+      }
+    }
+
+    void loadFeatureState()
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   if (isLoading) {
     return <RouteLoading />
@@ -145,6 +174,7 @@ export default function ParentDashboard() {
   const averageGrade = grades.length > 0 
     ? Math.round(grades.reduce((acc, g) => acc + g.knowledge, 0) / grades.length)
     : 0
+  const walletFeatureEnabled = isPageFeatureEnabled(SCHOOL_WALLET_FEATURE_KEY, featureState)
 
   return (
     <DashboardLayout role="PARENT" userName={parent.name} userAvatar={parent.avatar}>
@@ -206,19 +236,31 @@ export default function ParentDashboard() {
           </div>
         </GlassCard>
 
-        <SchoolWalletTopup
-          role="PARENT"
-          renderTrigger={({ openModal, walletBalance, pendingAmount, isLoading }) => (
-            <WalletCard
-              ownerName={parent.name}
-              secondaryLabel="Akun Orang Tua"
-              walletBalance={walletBalance}
-              pendingAmount={pendingAmount}
-              isLoading={isLoading}
-              onTopupClick={openModal}
-            />
-          )}
-        />
+        {walletFeatureEnabled ? (
+          <SchoolWalletTopup
+            role="PARENT"
+            renderTrigger={({ openModal, walletBalance, pendingAmount, isLoading }) => (
+              <WalletCard
+                ownerName={parent.name}
+                secondaryLabel="Akun Orang Tua"
+                walletBalance={walletBalance}
+                pendingAmount={pendingAmount}
+                isLoading={isLoading}
+                onTopupClick={openModal}
+              />
+            )}
+          />
+        ) : (
+          <WalletCard
+            ownerName={parent.name}
+            secondaryLabel="Akun Orang Tua"
+            walletBalance={0}
+            pendingAmount={0}
+            isLoading={false}
+            disabled
+            disabledReason="Dinonaktifkan oleh Kepala Sekolah"
+          />
+        )}
 
         {/* Quick Stats */}
         <div className="grid grid-cols-2 gap-3">

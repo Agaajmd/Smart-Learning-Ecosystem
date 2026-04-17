@@ -212,6 +212,15 @@ export const PAGE_FEATURE_DEFINITIONS = [
     roles: ["ADMIN"],
   },
   {
+    key: "shared_school_wallet",
+    label: "Dompet Sekolah (Global)",
+    description:
+      "Kontrol global fitur dompet/topup pada dashboard siswa, orang tua, guru, kepala sekolah, dan halaman konfirmasi topup admin",
+    href: "/admin/wallet-topups",
+    pathPrefix: "/__feature__/wallet",
+    roles: ["ADMIN"],
+  },
+  {
     key: "admin_users",
     label: "Data Pengguna Admin",
     description: "Halaman data pengguna admin",
@@ -283,6 +292,7 @@ export const PAGE_FEATURE_DEFINITIONS = [
 
 export type PageFeatureKey = (typeof PAGE_FEATURE_DEFINITIONS)[number]["key"]
 export type PageFeatureStateMap = Partial<Record<PageFeatureKey, boolean>>
+export const SCHOOL_WALLET_FEATURE_KEY = "shared_school_wallet" as const
 
 const PAGE_FEATURE_DEFINITION_BY_KEY = new Map<PageFeatureKey, PageFeatureDefinition>(
   PAGE_FEATURE_DEFINITIONS.map((item) => [item.key, item]),
@@ -291,6 +301,10 @@ const PAGE_FEATURE_DEFINITION_BY_KEY = new Map<PageFeatureKey, PageFeatureDefini
 const PAGE_FEATURE_DEFINITIONS_SORTED_BY_PREFIX = [...PAGE_FEATURE_DEFINITIONS].sort(
   (left, right) => right.pathPrefix.length - left.pathPrefix.length,
 )
+
+const PAGE_FEATURE_DEPENDENCIES: Partial<Record<PageFeatureKey, PageFeatureKey[]>> = {
+  admin_wallet_topups: [SCHOOL_WALLET_FEATURE_KEY],
+}
 
 export function normalizeFeaturePath(value: string) {
   const next = String(value || "").trim()
@@ -334,5 +348,9 @@ export function getDefaultPageFeatureStateMap(): Record<PageFeatureKey, boolean>
 export function isPageFeatureEnabled(key: PageFeatureKey | null, state: PageFeatureStateMap | null | undefined) {
   if (!key) return true
   if (!state) return true
-  return state[key] !== false
+
+  if (state[key] === false) return false
+
+  const dependencies = PAGE_FEATURE_DEPENDENCIES[key] || []
+  return dependencies.every((dependencyKey) => state[dependencyKey] !== false)
 }

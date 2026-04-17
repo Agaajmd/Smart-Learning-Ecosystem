@@ -11,6 +11,11 @@ import { ClassRoomGrid } from "@/components/organisms/class-room-grid"
 import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassCard } from "@/components/molecules/glass-card"
 import { GraduationCap } from "lucide-react"
+import {
+  isPageFeatureEnabled,
+  SCHOOL_WALLET_FEATURE_KEY,
+  type PageFeatureStateMap,
+} from "@/lib/page-features"
 
 export default function StudentDashboard() {
   const [student, setStudent] = useState<any>(null)
@@ -18,13 +23,17 @@ export default function StudentDashboard() {
   const [teacher, setTeacher] = useState<any>(null)
   const [studentClass, setStudentClass] = useState<any>(null)
   const [classmates, setClassmates] = useState<any[]>([])
+  const [featureState, setFeatureState] = useState<PageFeatureStateMap>({})
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState("")
 
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetch("/api/student/overview", { cache: "no-store" })
+        const [res, featureRes] = await Promise.all([
+          fetch("/api/student/overview", { cache: "no-store" }),
+          fetch("/api/page-features", { cache: "no-store" }),
+        ])
         if (!res.ok) {
           throw new Error("Gagal memuat dashboard siswa")
         }
@@ -34,6 +43,13 @@ export default function StudentDashboard() {
         setTeacher(data.teacher || null)
         setStudentClass(data.studentClass || null)
         setClassmates(Array.isArray(data.classmates) ? data.classmates : [])
+
+        if (featureRes.ok) {
+          const featurePayload = await featureRes.json()
+          if (featurePayload?.state && typeof featurePayload.state === "object") {
+            setFeatureState(featurePayload.state as PageFeatureStateMap)
+          }
+        }
       } catch {
         setLoadError("Dashboard belum bisa dimuat saat ini.")
       } finally {
@@ -65,6 +81,7 @@ export default function StudentDashboard() {
   const walletClassLabel = studentClass?.name
     ? `${studentClass.name}${studentClass?.grade ? ` - Grade ${studentClass.grade}` : ""}`
     : String(student.classId || "-")
+  const walletFeatureEnabled = isPageFeatureEnabled(SCHOOL_WALLET_FEATURE_KEY, featureState)
 
   return (
     <DashboardLayout role="STUDENT" userName={student.name} userAvatar={student.avatar}>
@@ -76,19 +93,31 @@ export default function StudentDashboard() {
         </div>
 
         {/* Quick Stats */}
-        <SchoolWalletTopup
-          role="STUDENT"
-          renderTrigger={({ openModal, walletBalance, pendingAmount, isLoading }) => (
-            <WalletCard
-              ownerName={student.name}
-              secondaryLabel={walletClassLabel}
-              walletBalance={walletBalance}
-              pendingAmount={pendingAmount}
-              isLoading={isLoading}
-              onTopupClick={openModal}
-            />
-          )}
-        />
+        {walletFeatureEnabled ? (
+          <SchoolWalletTopup
+            role="STUDENT"
+            renderTrigger={({ openModal, walletBalance, pendingAmount, isLoading }) => (
+              <WalletCard
+                ownerName={student.name}
+                secondaryLabel={walletClassLabel}
+                walletBalance={walletBalance}
+                pendingAmount={pendingAmount}
+                isLoading={isLoading}
+                onTopupClick={openModal}
+              />
+            )}
+          />
+        ) : (
+          <WalletCard
+            ownerName={student.name}
+            secondaryLabel={walletClassLabel}
+            walletBalance={0}
+            pendingAmount={0}
+            isLoading={false}
+            disabled
+            disabledReason="Dinonaktifkan oleh Kepala Sekolah"
+          />
+        )}
 
         <GamificationStats student={student} />
 

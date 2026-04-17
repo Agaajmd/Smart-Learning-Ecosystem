@@ -2,7 +2,8 @@
 
 import { GlassButton } from "@/components/atoms/glass-button"
 import { GlassCard } from "@/components/molecules/glass-card"
-import { Clock3, Sparkles, Trophy, Wallet } from "lucide-react"
+import { Clock3, Sparkles, Trophy, Wallet, XCircle } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface WalletCardProps {
   ownerName: string
@@ -12,6 +13,8 @@ interface WalletCardProps {
   isLoading?: boolean
   onTopupClick?: () => void
   topupLabel?: string
+  disabled?: boolean
+  disabledReason?: string
 }
 
 export const WalletCard = ({
@@ -22,6 +25,8 @@ export const WalletCard = ({
   isLoading = false,
   onTopupClick,
   topupLabel = "Topup Dompet",
+  disabled = false,
+  disabledReason = "Dinonaktifkan oleh Kepala Sekolah",
 }: WalletCardProps) => {
   const resolvedSecondaryLabel = String(secondaryLabel || "-")
 
@@ -33,14 +38,25 @@ export const WalletCard = ({
     }).format(Number(value || 0))
 
   return (
-    <GlassCard className="relative overflow-hidden bg-gradient-to-br from-blue-500 to-blue-600 p-5 group transition-all duration-500 hover:shadow-xl hover:shadow-blue-500/25">
+    <GlassCard
+      className={cn(
+        "relative overflow-hidden p-5 group transition-all duration-500",
+        disabled
+          ? "bg-gradient-to-br from-slate-300 to-slate-400 pointer-events-none"
+          : "bg-gradient-to-br from-blue-500 to-blue-600 hover:shadow-xl hover:shadow-blue-500/25",
+      )}
+    >
       <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 transition-transform duration-700 group-hover:scale-110" />
       <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2 transition-transform duration-700 group-hover:scale-110" />
 
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs font-medium text-white/90">Dompet Sekolah</span>
-          <Sparkles className="w-4 h-4 text-yellow-300 animate-pulse" />
+          {disabled ? (
+            <XCircle className="w-4 h-4 text-rose-200" />
+          ) : (
+            <Sparkles className="w-4 h-4 text-yellow-300 animate-pulse" />
+          )}
         </div>
 
         <div className="flex items-center gap-2 mb-4">
@@ -51,7 +67,7 @@ export const WalletCard = ({
         <div className="mb-4 flex items-center gap-2 text-[11px] text-white/90">
           <span className="rounded-full bg-white/20 px-2 py-0.5 inline-flex items-center gap-1">
             <Clock3 className="w-3 h-3" />
-            Menunggu {formatCurrency(pendingAmount)}
+            {disabled ? disabledReason : `Menunggu ${formatCurrency(pendingAmount)}`}
           </span>
         </div>
 
@@ -63,12 +79,17 @@ export const WalletCard = ({
         <GlassButton
           type="button"
           size="sm"
-          className="w-full bg-white text-blue-700 hover:bg-blue-50"
-          onClick={onTopupClick}
-          disabled={!onTopupClick}
+          className={cn(
+            "w-full",
+            disabled
+              ? "bg-slate-100 text-slate-500 border border-slate-300"
+              : "bg-white text-blue-700 hover:bg-blue-50",
+          )}
+          onClick={disabled ? undefined : onTopupClick}
+          disabled={disabled || !onTopupClick}
         >
-          <Wallet className="w-4 h-4 mr-2" />
-          {topupLabel}
+          {disabled ? <XCircle className="w-4 h-4 mr-2" /> : <Wallet className="w-4 h-4 mr-2" />}
+          {disabled ? "Dompet Dinonaktifkan" : topupLabel}
         </GlassButton>
       </div>
     </GlassCard>

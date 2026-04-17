@@ -9,6 +9,11 @@ import { WalletCard } from "@/components/organisms/wallet-card"
 import { Calendar, LayoutGrid, BookOpen, Users, Award } from "lucide-react"
 import Link from "next/link"
 import type { Student } from "@/lib/data-model"
+import {
+  isPageFeatureEnabled,
+  SCHOOL_WALLET_FEATURE_KEY,
+  type PageFeatureStateMap,
+} from "@/lib/page-features"
 
 type Employee = { id: string; name: string; subject: string; classesCount: number; rating: number }
 type Schedule = { id: string; day: string }
@@ -21,14 +26,26 @@ export default function EmployeeDashboard() {
   const [todayClasses, setTodayClasses] = useState<Schedule[]>([])
   const [students, setStudents] = useState<Student[]>([])
   const [primaryClassId, setPrimaryClassId] = useState("")
+  const [featureState, setFeatureState] = useState<PageFeatureStateMap>({})
 
   useEffect(() => {
     let active = true
     const load = async () => {
       try {
-        const res = await fetch("/api/dashboard/employee", { cache: "no-store" })
+        const [res, featureRes] = await Promise.all([
+          fetch("/api/dashboard/employee", { cache: "no-store" }),
+          fetch("/api/page-features", { cache: "no-store" }),
+        ])
         const data = res.ok ? await res.json() : {}
         if (!active) return
+
+        if (featureRes.ok) {
+          const featurePayload = await featureRes.json()
+          if (featurePayload?.state && typeof featurePayload.state === "object") {
+            setFeatureState(featurePayload.state as PageFeatureStateMap)
+          }
+        }
+
         if (data.employee) {
           setEmployee((prev) => ({
             ...prev,
@@ -100,6 +117,8 @@ export default function EmployeeDashboard() {
     return <RouteLoading />
   }
 
+  const walletFeatureEnabled = isPageFeatureEnabled(SCHOOL_WALLET_FEATURE_KEY, featureState)
+
   const quickActions = [
     {
       href: "/employee/schedule",
@@ -125,19 +144,31 @@ export default function EmployeeDashboard() {
           <p className="text-slate-500">{employee.name}</p>
         </div>
 
-        <SchoolWalletTopup
-          role="EMPLOYEE"
-          renderTrigger={({ openModal, walletBalance, pendingAmount, isLoading }) => (
-            <WalletCard
-              ownerName={employee.name}
-              secondaryLabel={employee.subject || "Guru"}
-              walletBalance={walletBalance}
-              pendingAmount={pendingAmount}
-              isLoading={isLoading}
-              onTopupClick={openModal}
-            />
-          )}
-        />
+        {walletFeatureEnabled ? (
+          <SchoolWalletTopup
+            role="EMPLOYEE"
+            renderTrigger={({ openModal, walletBalance, pendingAmount, isLoading }) => (
+              <WalletCard
+                ownerName={employee.name}
+                secondaryLabel={employee.subject || "Guru"}
+                walletBalance={walletBalance}
+                pendingAmount={pendingAmount}
+                isLoading={isLoading}
+                onTopupClick={openModal}
+              />
+            )}
+          />
+        ) : (
+          <WalletCard
+            ownerName={employee.name}
+            secondaryLabel={employee.subject || "Guru"}
+            walletBalance={0}
+            pendingAmount={0}
+            isLoading={false}
+            disabled
+            disabledReason="Dinonaktifkan oleh Kepala Sekolah"
+          />
+        )}
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

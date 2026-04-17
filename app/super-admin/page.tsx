@@ -29,6 +29,11 @@ import {
   ,ReceiptText
 } from "lucide-react"
 import Link from "next/link"
+import {
+  isPageFeatureEnabled,
+  SCHOOL_WALLET_FEATURE_KEY,
+  type PageFeatureStateMap,
+} from "@/lib/page-features"
 
 export default function SuperAdminDashboard() {
   const [superAdmin, setSuperAdmin] = useState<{ name: string; avatar: string } | null>(null)
@@ -45,12 +50,16 @@ export default function SuperAdminDashboard() {
   const [agenda, setAgenda] = useState<Array<{ id: number; title: string; date: string; priority: string }>>([])
   const [activities, setActivities] = useState<Array<{ id: number; action: string; time: string; type: string }>>([])
   const [selectedPeriod, setSelectedPeriod] = useState("year")
+  const [featureState, setFeatureState] = useState<PageFeatureStateMap>({})
 
   useEffect(() => {
     let active = true
     const load = async () => {
       try {
-        const res = await fetch("/api/super-admin/overview", { cache: "no-store" })
+        const [res, featureRes] = await Promise.all([
+          fetch("/api/super-admin/overview", { cache: "no-store" }),
+          fetch("/api/page-features", { cache: "no-store" }),
+        ])
         if (!res.ok) return
         const data = await res.json()
         if (!active) return
@@ -62,6 +71,13 @@ export default function SuperAdminDashboard() {
         if (data.schoolPerformance) setPerformance(data.schoolPerformance)
         if (Array.isArray(data.announcements)) setAgenda(data.announcements)
         if (Array.isArray(data.recentActivities)) setActivities(data.recentActivities)
+
+        if (featureRes.ok) {
+          const featurePayload = await featureRes.json()
+          if (featurePayload?.state && typeof featurePayload.state === "object") {
+            setFeatureState(featurePayload.state as PageFeatureStateMap)
+          }
+        }
       } catch {
         // Keep current state when API is unavailable.
       }
@@ -98,6 +114,7 @@ export default function SuperAdminDashboard() {
     { href: "/super-admin/staff", icon: Users, label: "Manajemen Staff", description: "Kelola staff, admin, dan pengaturan akses", color: "bg-blue-500" },
     { href: "/super-admin/features", icon: SlidersHorizontal, label: "Manajemen Fitur", description: "Aktifkan/nonaktifkan page lintas role", color: "bg-purple-500" },
   ]
+  const walletFeatureEnabled = isPageFeatureEnabled(SCHOOL_WALLET_FEATURE_KEY, featureState)
 
   if (!superAdmin) {
     return <RouteLoading />
@@ -134,19 +151,31 @@ export default function SuperAdminDashboard() {
           </div>
         </div>
 
-        <SchoolWalletTopup
-          role="SUPER_ADMIN"
-          renderTrigger={({ openModal, walletBalance, pendingAmount, isLoading }) => (
-            <WalletCard
-              ownerName={superAdmin.name}
-              secondaryLabel="Kepala Sekolah"
-              walletBalance={walletBalance}
-              pendingAmount={pendingAmount}
-              isLoading={isLoading}
-              onTopupClick={openModal}
-            />
-          )}
-        />
+        {walletFeatureEnabled ? (
+          <SchoolWalletTopup
+            role="SUPER_ADMIN"
+            renderTrigger={({ openModal, walletBalance, pendingAmount, isLoading }) => (
+              <WalletCard
+                ownerName={superAdmin.name}
+                secondaryLabel="Kepala Sekolah"
+                walletBalance={walletBalance}
+                pendingAmount={pendingAmount}
+                isLoading={isLoading}
+                onTopupClick={openModal}
+              />
+            )}
+          />
+        ) : (
+          <WalletCard
+            ownerName={superAdmin.name}
+            secondaryLabel="Kepala Sekolah"
+            walletBalance={0}
+            pendingAmount={0}
+            isLoading={false}
+            disabled
+            disabledReason="Dinonaktifkan oleh Kepala Sekolah"
+          />
+        )}
 
         {/* Quick Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
