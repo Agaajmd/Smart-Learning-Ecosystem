@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { EmptySkeleton } from "@/components/molecules/empty-skeleton"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
@@ -143,6 +143,124 @@ const fetchWithTimeout = async (input: RequestInfo | URL, init?: RequestInit, ti
   }
 }
 
+interface ProductCardProps {
+  product: Product
+  canteenName?: string
+  quantity: number
+  onAdd: (product: Product) => void
+  onRemove: (productId: string) => void
+}
+
+const ProductCard = memo(function ProductCard({
+  product,
+  canteenName,
+  quantity,
+  onAdd,
+  onRemove,
+}: ProductCardProps) {
+  return (
+    <div className="bg-white rounded-2xl shadow hover:shadow-md transition-shadow overflow-hidden perf-list-item">
+      <div className="relative">
+        <img
+          src={product.image}
+          alt={product.name}
+          loading="lazy"
+          decoding="async"
+          className="w-full h-28 object-cover"
+        />
+        <span
+          className={cn(
+            "absolute top-2 left-2 px-2 py-0.5 rounded-full text-xs font-medium",
+            product.category === "MAKANAN"
+              ? "bg-orange-100 text-orange-700"
+              : product.category === "MINUMAN"
+                ? "bg-blue-100 text-blue-700"
+                : "bg-purple-100 text-purple-700",
+          )}
+        >
+          {product.category}
+        </span>
+      </div>
+      <div className="p-3">
+        <p className="text-xs text-slate-500 truncate">{canteenName}</p>
+        <h3 className="font-semibold text-slate-800 text-sm truncate mt-0.5">{product.name}</h3>
+        <p className="text-xs text-slate-500 line-clamp-1 mt-1">{product.description}</p>
+        <div className="flex items-center justify-between mt-3">
+          <p className="font-bold text-orange-600">Rp {product.price.toLocaleString()}</p>
+          {quantity > 0 ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onRemove(product.id)}
+                className="p-1 rounded-full bg-orange-100 text-orange-600 hover:bg-orange-200"
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+              <span className="font-bold text-slate-800 w-6 text-center">{quantity}</span>
+              <button
+                onClick={() => onAdd(product)}
+                disabled={quantity >= product.stock}
+                className="p-1 rounded-full bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => onAdd(product)}
+              disabled={product.stock <= 0}
+              className="p-1.5 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+})
+
+interface CartItemRowProps {
+  item: CartItem
+  product?: Product
+  onAdd: (product: Product) => void
+  onRemove: (productId: string) => void
+}
+
+const CartItemRow = memo(function CartItemRow({ item, product, onAdd, onRemove }: CartItemRowProps) {
+  return (
+    <div className="flex items-center gap-3 perf-list-item">
+      <img
+        src={product?.image}
+        alt={item.productName}
+        loading="lazy"
+        decoding="async"
+        className="w-16 h-16 rounded-xl object-cover"
+      />
+      <div className="flex-1 min-w-0">
+        <h4 className="font-medium text-slate-800 truncate">{item.productName}</h4>
+        <p className="text-orange-600 font-bold">Rp {(item.price * item.quantity).toLocaleString()}</p>
+        <p className="text-xs text-slate-500">@ Rp {item.price.toLocaleString()}</p>
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => onRemove(item.productId)}
+          className="p-1.5 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200"
+        >
+          <Minus className="w-4 h-4" />
+        </button>
+        <span className="font-bold text-slate-800 w-6 text-center">{item.quantity}</span>
+        <button
+          onClick={() => product && onAdd(product)}
+          disabled={!product || item.quantity >= product.stock}
+          className="p-1.5 rounded-full bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Plus className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  )
+})
+
 export default function CanteenPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
@@ -161,6 +279,7 @@ export default function CanteenPage() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [walletError, setWalletError] = useState<string | null>(null)
+  const cartRef = useRef<CartItem[]>([])
 
   const loadOrderHistory = useCallback(async () => {
     try {
@@ -255,27 +374,59 @@ export default function CanteenPage() {
   }, [])
 
   useEffect(() => {
+    cartRef.current = cart
+  }, [cart])
+
+  useEffect(() => {
     void loadOrderHistory()
     void loadWalletSummary()
-    const intervalId = window.setInterval(() => {
+    let intervalId: number | null = null
+
+    const refresh = () => {
       void loadOrderHistory()
       void loadWalletSummary()
-    }, 15000)
+    }
+
+    const startPolling = () => {
+      if (intervalId !== null) return
+      intervalId = window.setInterval(refresh, 15000)
+    }
+
+    const stopPolling = () => {
+      if (intervalId === null) return
+      window.clearInterval(intervalId)
+      intervalId = null
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopPolling()
+      } else {
+        refresh()
+        startPolling()
+      }
+    }
+
+    if (!document.hidden) {
+      startPolling()
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
 
     return () => {
-      window.clearInterval(intervalId)
+      stopPolling()
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
     }
   }, [loadOrderHistory, loadWalletSummary])
 
   const activeCanteens = useMemo(() => canteens.filter((canteen) => canteen.isOpen), [canteens])
+  const canteenById = useMemo(() => new Map(canteens.map((canteen) => [canteen.id, canteen])), [canteens])
+  const openCanteenIds = useMemo(() => new Set(activeCanteens.map((canteen) => canteen.id)), [activeCanteens])
+  const productById = useMemo(() => new Map(products.map((product) => [product.id, product])), [products])
   
   const allProducts = useMemo(
-    () =>
-      products.filter((product) => {
-        const canteen = canteens.find((item) => item.id === product.canteenId)
-        return canteen?.isOpen && product.isAvailable
-      }),
-    [canteens, products],
+    () => products.filter((product) => openCanteenIds.has(product.canteenId) && product.isAvailable),
+    [openCanteenIds, products],
   )
 
   const filteredProducts = useMemo(() => {
@@ -302,10 +453,11 @@ export default function CanteenPage() {
   const cartItemCount = useMemo(() => cart.reduce((acc, item) => acc + item.quantity, 0), [cart])
 
   const addToCart = useCallback((product: Product) => {
-    const canteen = canteens.find(c => c.id === product.canteenId)
+    const currentCart = cartRef.current
+    const canteen = canteenById.get(product.canteenId)
     if (!canteen) return
 
-    const existingItem = cart.find((item) => item.productId === product.id)
+    const existingItem = currentCart.find((item) => item.productId === product.id)
     const currentQty = existingItem?.quantity || 0
     if (currentQty >= Number(product.stock || 0)) {
       toast.error(`Stok ${product.name} tidak mencukupi`, {
@@ -315,7 +467,7 @@ export default function CanteenPage() {
     }
 
     // Check if cart has items from different canteen
-    if (cart.length > 0 && cart[0].canteenId !== product.canteenId) {
+    if (currentCart.length > 0 && currentCart[0].canteenId !== product.canteenId) {
       toast.error("Anda hanya bisa pesan dari satu kantin dalam satu waktu", {
         description: "Kosongkan keranjang terlebih dahulu",
       })
@@ -344,22 +496,22 @@ export default function CanteenPage() {
       ])
     }
     toast.success(`${product.name} ditambahkan ke keranjang`)
-  }, [cart, canteens])
+  }, [canteenById])
 
   const removeFromCart = useCallback((productId: string) => {
-    const existingItem = cart.find(item => item.productId === productId)
-    if (existingItem && existingItem.quantity > 1) {
-      setCart((prev) =>
-        prev.map((item) =>
+    setCart((prev) => {
+      const existingItem = prev.find((item) => item.productId === productId)
+      if (!existingItem) return prev
+      if (existingItem.quantity > 1) {
+        return prev.map((item) =>
           item.productId === productId
             ? { ...item, quantity: item.quantity - 1 }
             : item,
-        ),
-      )
-    } else {
-      setCart((prev) => prev.filter((item) => item.productId !== productId))
-    }
-  }, [cart])
+        )
+      }
+      return prev.filter((item) => item.productId !== productId)
+    })
+  }, [])
 
   const clearCart = useCallback(() => {
     setCart([])
@@ -378,7 +530,7 @@ export default function CanteenPage() {
         return
       }
 
-      const staleItem = cart.find((item) => !products.find((product) => product.id === item.productId))
+      const staleItem = cart.find((item) => !productById.has(item.productId))
       if (staleItem) {
         toast.error("Ada produk yang sudah tidak tersedia. Muat ulang halaman lalu coba lagi.")
         return
@@ -426,7 +578,7 @@ export default function CanteenPage() {
       )
 
       if (data?.order?.id) {
-        const fallbackCanteenName = canteens.find((item) => item.id === canteenId)?.name || "Kantin"
+        const fallbackCanteenName = canteenById.get(canteenId)?.name || "Kantin"
         const nextOrder: CanteenOrderHistory = {
           ...data.order,
           canteenName: String(data.order.canteenName || fallbackCanteenName),
@@ -456,7 +608,7 @@ export default function CanteenPage() {
     } finally {
       setIsCheckingOut(false)
     }
-  }, [cart, canteens, clearCart, loadOrderHistory, loadWalletSummary, products])
+  }, [cart, canteenById, clearCart, loadOrderHistory, loadWalletSummary, productById])
 
   const quantityByProduct = useMemo(() => {
     return cart.reduce<Record<string, number>>((acc, item) => {
@@ -475,7 +627,7 @@ export default function CanteenPage() {
   const pageContent = (
     <>
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-lg border-b border-slate-100">
+      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-lg perf-surface-blur border-b border-slate-100">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -520,7 +672,7 @@ export default function CanteenPage() {
 
       <main className="max-w-4xl mx-auto px-4 py-6 pb-32">
         {/* Category Filter */}
-        <div className="flex gap-3 overflow-x-auto pb-4 mb-6">
+        <div className="flex gap-3 overflow-x-auto pb-4 mb-6 perf-scroll-container">
           {categories.map(cat => {
             const Icon = cat.icon
             return (
@@ -528,7 +680,7 @@ export default function CanteenPage() {
                 key={cat.value}
                 onClick={() => setSelectedCategory(cat.value)}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-2.5 rounded-2xl font-medium transition-all whitespace-nowrap",
+                  "flex items-center gap-2 px-4 py-2.5 rounded-2xl font-medium transition-[background-color,color,box-shadow,border-color] whitespace-nowrap",
                   selectedCategory === cat.value
                     ? "bg-orange-500 text-white shadow-lg shadow-orange-500/30"
                     : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
@@ -595,7 +747,7 @@ export default function CanteenPage() {
               </button>
             )}
           </div>
-          <div className="flex gap-4 overflow-x-auto pb-2">
+          <div className="flex gap-4 overflow-x-auto pb-2 perf-scroll-container">
             {isLoading ? (
               <div className="min-w-full bg-white rounded-2xl p-2">
                 <EmptySkeleton rows={2} className="py-4" />
@@ -611,7 +763,7 @@ export default function CanteenPage() {
                   key={canteen.id}
                   onClick={() => setSelectedCanteen(selectedCanteen?.id === canteen.id ? null : canteen)}
                   className={cn(
-                    "min-w-[200px] bg-white rounded-2xl p-4 border-2 transition-all text-left",
+                    "min-w-[200px] bg-white rounded-2xl p-4 border-2 transition-[border-color,box-shadow,background-color,transform] text-left perf-list-item",
                     selectedCanteen?.id === canteen.id 
                       ? "border-orange-500 shadow-lg shadow-orange-500/20" 
                       : "border-transparent shadow hover:shadow-md"
@@ -620,6 +772,8 @@ export default function CanteenPage() {
                   <img 
                     src={canteen.image} 
                     alt={canteen.name}
+                    loading="lazy"
+                    decoding="async"
                     className="w-full h-24 object-cover rounded-xl mb-3"
                   />
                   <h3 className="font-semibold text-slate-800 truncate">{canteen.name}</h3>
@@ -657,67 +811,16 @@ export default function CanteenPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4">
-              {filteredProducts.map(product => {
-                const canteen = canteens.find(c => c.id === product.canteenId)
-                const quantity = getItemQuantity(product.id)
-
-                return (
-                  <div 
-                    key={product.id}
-                    className="bg-white rounded-2xl shadow hover:shadow-md transition-shadow overflow-hidden"
-                  >
-                    <div className="relative">
-                      <img 
-                        src={product.image} 
-                        alt={product.name}
-                        className="w-full h-28 object-cover"
-                      />
-                      <span className={cn(
-                        "absolute top-2 left-2 px-2 py-0.5 rounded-full text-xs font-medium",
-                        product.category === "MAKANAN" ? "bg-orange-100 text-orange-700" :
-                        product.category === "MINUMAN" ? "bg-blue-100 text-blue-700" :
-                        "bg-purple-100 text-purple-700"
-                      )}>
-                        {product.category}
-                      </span>
-                    </div>
-                    <div className="p-3">
-                      <p className="text-xs text-slate-500 truncate">{canteen?.name}</p>
-                      <h3 className="font-semibold text-slate-800 text-sm truncate mt-0.5">{product.name}</h3>
-                      <p className="text-xs text-slate-500 line-clamp-1 mt-1">{product.description}</p>
-                      <div className="flex items-center justify-between mt-3">
-                        <p className="font-bold text-orange-600">Rp {product.price.toLocaleString()}</p>
-                        {quantity > 0 ? (
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => removeFromCart(product.id)}
-                              className="p-1 rounded-full bg-orange-100 text-orange-600 hover:bg-orange-200"
-                            >
-                              <Minus className="w-4 h-4" />
-                            </button>
-                            <span className="font-bold text-slate-800 w-6 text-center">{quantity}</span>
-                            <button
-                              onClick={() => addToCart(product)}
-                              disabled={quantity >= product.stock}
-                              className="p-1 rounded-full bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              <Plus className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => addToCart(product)}
-                            disabled={product.stock <= 0}
-                            className="p-1.5 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
+              {filteredProducts.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  canteenName={canteenById.get(product.canteenId)?.name}
+                  quantity={getItemQuantity(product.id)}
+                  onAdd={addToCart}
+                  onRemove={removeFromCart}
+                />
+              ))}
             </div>
           )}
         </section>
@@ -752,7 +855,7 @@ export default function CanteenPage() {
                 })
 
                 return (
-                  <div key={order.id} className="bg-white rounded-2xl border border-slate-200 p-4">
+                  <div key={order.id} className="bg-white rounded-2xl border border-slate-200 p-4 perf-list-item">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="font-semibold text-slate-800">Pesanan {orderDateLabel}</p>
@@ -821,10 +924,10 @@ export default function CanteenPage() {
       {showCart && (
         <div className="fixed inset-0 z-50">
           <div 
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm perf-overlay-blur"
             onClick={() => setShowCart(false)}
           />
-          <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl max-h-[80vh] overflow-hidden animate-in slide-in-from-bottom duration-300">
+          <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl max-h-[80vh] overflow-hidden animate-in slide-in-from-bottom duration-300 perf-surface-blur">
             <div className="p-4 border-b border-slate-100">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-bold text-slate-800">Keranjang Belanja</h2>
@@ -837,42 +940,18 @@ export default function CanteenPage() {
               )}
             </div>
 
-            <div className="p-4 overflow-y-auto max-h-[50vh]">
+            <div className="p-4 overflow-y-auto max-h-[50vh] perf-scroll-container">
               {cart.length > 0 ? (
                 <div className="space-y-4">
-                  {cart.map(item => {
-                    const product = products.find(p => p.id === item.productId)
-                    return (
-                      <div key={item.productId} className="flex items-center gap-3">
-                        <img 
-                          src={product?.image} 
-                          alt={item.productName}
-                          className="w-16 h-16 rounded-xl object-cover"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-slate-800 truncate">{item.productName}</h4>
-                          <p className="text-orange-600 font-bold">Rp {(item.price * item.quantity).toLocaleString()}</p>
-                          <p className="text-xs text-slate-500">@ Rp {item.price.toLocaleString()}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => removeFromCart(item.productId)}
-                            className="p-1.5 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200"
-                          >
-                            <Minus className="w-4 h-4" />
-                          </button>
-                          <span className="font-bold text-slate-800 w-6 text-center">{item.quantity}</span>
-                          <button
-                            onClick={() => product && addToCart(product)}
-                            disabled={!product || item.quantity >= product.stock}
-                            className="p-1.5 rounded-full bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  })}
+                  {cart.map((item) => (
+                    <CartItemRow
+                      key={item.productId}
+                      item={item}
+                      product={productById.get(item.productId)}
+                      onAdd={addToCart}
+                      onRemove={removeFromCart}
+                    />
+                  ))}
                 </div>
               ) : (
                 <div className="text-center py-8">

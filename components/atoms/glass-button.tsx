@@ -28,7 +28,7 @@ export const GlassButton = ({ children, className, variant = "default", size = "
     <button
       className={cn(
         "rounded-lg font-medium shadow-sm",
-        "transition-all duration-300 ease-out",
+        "transition-[color,background-color,border-color,box-shadow,transform] duration-300 ease-out",
         "hover:shadow-md active:scale-[0.97] flex items-center justify-center",
         "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100",
         variants[variant],

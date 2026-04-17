@@ -154,7 +154,7 @@ const Navigation = memo(function Navigation({
       "fixed top-3 sm:top-4 left-0 right-0 z-50",
       "px-3 sm:px-6"
     )}>
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 bg-white/90 backdrop-blur-xl border border-blue-100/90 rounded-full shadow-xl shadow-blue-100/60">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 bg-white/90 backdrop-blur-xl perf-surface-blur border border-blue-100/90 rounded-full shadow-xl shadow-blue-100/60 perf-heavy-shadow">
         <div className="flex items-center justify-between h-16 lg:h-18">
           <Logo />
 
@@ -241,8 +241,8 @@ const HeroSection = memo(function HeroSection() {
   return (
     <section className="relative pt-28 sm:pt-36 lg:pt-44 pb-16 sm:pb-20 lg:pb-32 overflow-hidden">
       <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-        <div className="absolute top-20 left-10 w-32 h-32 sm:w-64 sm:h-64 bg-blue-200/40 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-20 right-10 w-32 h-32 sm:w-72 sm:h-72 bg-blue-300/35 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '700ms' }} />
+        <div className="absolute top-20 left-10 w-32 h-32 sm:w-64 sm:h-64 bg-blue-200/40 rounded-full blur-3xl animate-pulse perf-decorative-motion" />
+        <div className="absolute bottom-20 right-10 w-32 h-32 sm:w-72 sm:h-72 bg-blue-300/35 rounded-full blur-3xl animate-pulse perf-decorative-motion" style={{ animationDelay: '700ms' }} />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-100/60 rounded-full blur-3xl" />
       </div>
 

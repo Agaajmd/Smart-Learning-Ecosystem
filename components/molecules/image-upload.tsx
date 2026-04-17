@@ -111,7 +111,7 @@ export function ImageUpload({
       {/* Upload Area */}
       <div
         className={cn(
-          "relative flex items-center justify-center border-2 border-dashed transition-all duration-300 cursor-pointer overflow-hidden group",
+          "relative flex items-center justify-center border-2 border-dashed transition-[transform,border-color,background-color] duration-300 cursor-pointer overflow-hidden group",
           sizeClasses[size],
           shape === "circle" ? "rounded-full" : "rounded-2xl",
           isDragging
@@ -129,6 +129,8 @@ export function ImageUpload({
             <img
               src={preview}
               alt="Preview"
+              loading="lazy"
+              decoding="async"
               className={cn(
                 "w-full h-full object-cover",
                 shape === "circle" ? "rounded-full" : "rounded-2xl"
@@ -137,7 +139,7 @@ export function ImageUpload({
             {/* Overlay on hover */}
             <div
               className={cn(
-                "absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center",
+                "absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center",
                 shape === "circle" ? "rounded-full" : "rounded-2xl"
               )}
             >
@@ -167,7 +169,7 @@ export function ImageUpload({
               handleRemove()
             }}
             className={cn(
-              "absolute -top-1 -right-1 w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600",
+              "absolute -top-1 -right-1 w-7 h-7 rounded-full bg-red-500 text-white flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-[opacity,background-color,transform] duration-200 hover:bg-red-600",
               "transform hover:scale-110"
             )}
           >
@@ -255,7 +257,7 @@ export function ImageUploadModal({
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-sm bg-white/10 backdrop-blur-2xl border border-white/20 rounded-3xl p-6 shadow-2xl animate-in zoom-in-95 duration-300">
+      <div className="relative w-full max-w-sm bg-white/10 backdrop-blur-2xl perf-surface-blur border border-white/20 rounded-3xl p-6 shadow-2xl perf-heavy-shadow animate-in zoom-in-95 duration-300">
         <h2 className="text-lg font-semibold text-slate-800 text-center mb-6">
           {title}
         </h2>

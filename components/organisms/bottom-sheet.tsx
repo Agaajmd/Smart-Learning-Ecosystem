@@ -23,6 +23,7 @@ export function BottomSheet({
   const closeTimerRef = React.useRef<number | null>(null)
   const startYRef = React.useRef(0)
   const currentYRef = React.useRef(0)
+  const moveRafRef = React.useRef<number | null>(null)
 
   React.useEffect(() => {
     setMounted(true)
@@ -44,6 +45,10 @@ export function BottomSheet({
         window.clearTimeout(closeTimerRef.current)
         closeTimerRef.current = null
       }
+      if (moveRafRef.current !== null) {
+        window.cancelAnimationFrame(moveRafRef.current)
+        moveRafRef.current = null
+      }
     }
   }, [open])
 
@@ -62,6 +67,22 @@ export function BottomSheet({
     }, 300)
   }, [isClosing, onOpenChange, open])
 
+  const applyDragTransform = React.useCallback(() => {
+    if (moveRafRef.current !== null) {
+      return
+    }
+
+    moveRafRef.current = window.requestAnimationFrame(() => {
+      moveRafRef.current = null
+      if (!sheetRef.current) {
+        return
+      }
+
+      const offset = Math.max(currentYRef.current, 0)
+      sheetRef.current.style.transform = offset > 0 ? `translate3d(0, ${offset}px, 0)` : ''
+    })
+  }, [])
+
   const handleTouchStart = (e: React.TouchEvent) => {
     startYRef.current = e.touches[0].clientY
     currentYRef.current = 0
@@ -69,14 +90,16 @@ export function BottomSheet({
 
   const handleTouchMove = (e: React.TouchEvent) => {
     const deltaY = e.touches[0].clientY - startYRef.current
-    currentYRef.current = deltaY
-    
-    if (deltaY > 0 && sheetRef.current) {
-      sheetRef.current.style.transform = `translateY(${deltaY}px)`
-    }
+    currentYRef.current = deltaY > 0 ? deltaY : 0
+    applyDragTransform()
   }
 
   const handleTouchEnd = () => {
+    if (moveRafRef.current !== null) {
+      window.cancelAnimationFrame(moveRafRef.current)
+      moveRafRef.current = null
+    }
+
     if (sheetRef.current) {
       if (currentYRef.current > 100) {
         handleClose()
@@ -101,7 +124,7 @@ export function BottomSheet({
       {/* Overlay - Click to close */}
       <div 
         className={cn(
-          'absolute inset-0 bg-black/50 backdrop-blur-sm cursor-pointer',
+          'absolute inset-0 bg-black/50 backdrop-blur-sm perf-overlay-blur cursor-pointer',
           'transition-opacity duration-300',
           isClosing ? 'opacity-0' : 'opacity-100'
         )}

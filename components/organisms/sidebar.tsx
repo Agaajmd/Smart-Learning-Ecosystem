@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname } from "next/navigation"
@@ -53,20 +53,29 @@ type SidebarNavItem = {
   disabledReason?: string
 }
 
+const ROLE_LABELS: Record<UserRole, string> = {
+  STUDENT: "Student",
+  EMPLOYEE: "Teacher",
+  ADMIN: "Admin",
+  SUPER_ADMIN: "Principal",
+  PARENT: "Parent",
+  CANTEEN_OWNER: "Canteen Owner",
+}
+
 export const Sidebar = ({ role, userName, userAvatar, featureState }: SidebarProps) => {
   const pathname = usePathname()
   const { logout } = useAuth()
   const [showUserMenu, setShowUserMenu] = useState(false)
   const profilePath = `/${role.toLowerCase().replace("_", "-")}/profile`
-  const resolvedAvatar = (() => {
+  const resolvedAvatar = useMemo(() => {
     const next = String(userAvatar || "").trim()
     if (!next || next === "null" || next === "undefined") {
       return "/placeholder-user.jpg"
     }
     return next
-  })()
+  }, [userAvatar])
 
-  const getNavItems = (): SidebarNavItem[] => {
+  const baseNavItems = useMemo<SidebarNavItem[]>(() => {
     switch (role) {
       case "STUDENT":
         return [
@@ -128,28 +137,23 @@ export const Sidebar = ({ role, userName, userAvatar, featureState }: SidebarPro
       default:
         return []
     }
-  }
+  }, [role])
 
-  const navItems = getNavItems().map((item) => {
-    const featureKey = getPageFeatureKeyForPath(item.href, role)
-    if (!featureKey) return item
-    if (isPageFeatureEnabled(featureKey, featureState)) return item
+  const navItems = useMemo(
+    () =>
+      baseNavItems.map((item) => {
+        const featureKey = getPageFeatureKeyForPath(item.href, role)
+        if (!featureKey) return item
+        if (isPageFeatureEnabled(featureKey, featureState)) return item
 
-    return {
-      ...item,
-      disabled: true,
-      disabledReason: "Fitur ini dinonaktifkan oleh Kepala Sekolah",
-    }
-  })
-
-  const roleLabels: Record<UserRole, string> = {
-    STUDENT: "Student",
-    EMPLOYEE: "Teacher",
-    ADMIN: "Admin",
-    SUPER_ADMIN: "Principal",
-    PARENT: "Parent",
-    CANTEEN_OWNER: "Canteen Owner",
-  }
+        return {
+          ...item,
+          disabled: true,
+          disabledReason: "Fitur ini dinonaktifkan oleh Kepala Sekolah",
+        }
+      }),
+    [baseNavItems, featureState, role],
+  )
 
   return (
     <aside className="hidden md:flex fixed left-4 top-4 bottom-4 w-64 z-40">
@@ -172,7 +176,7 @@ export const Sidebar = ({ role, userName, userAvatar, featureState }: SidebarPro
 
         {/* Navigation */}
         <nav className="flex-1 space-y-1">
-          {navItems.map((item, index) => {
+          {navItems.map((item) => {
             const isActive = pathname === item.href
             const Icon = item.icon
 
@@ -182,8 +186,7 @@ export const Sidebar = ({ role, userName, userAvatar, featureState }: SidebarPro
                   key={item.href}
                   type="button"
                   onClick={() => toast.info(item.disabledReason || "Fitur sedang dinonaktifkan")}
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 bg-slate-50/80 border border-dashed border-slate-200 cursor-not-allowed"
-                  style={{ animationDelay: `${index * 50}ms` }}
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 bg-slate-50/80 border border-dashed border-slate-200 cursor-not-allowed perf-list-item"
                 >
                   <Icon className="w-5 h-5" />
                   <span className="font-medium">{item.label}</span>
@@ -199,12 +202,11 @@ export const Sidebar = ({ role, userName, userAvatar, featureState }: SidebarPro
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300",
+                  "flex items-center gap-3 px-4 py-3 rounded-xl transition-[background-color,color,transform,box-shadow] duration-300 perf-list-item",
                   isActive
                     ? "bg-blue-50 text-blue-600 shadow-sm"
                     : "text-slate-600 hover:text-slate-800 hover:bg-slate-50 hover:translate-x-1 active:scale-[0.98]",
                 )}
-                style={{ animationDelay: `${index * 50}ms` }}
               >
                 <Icon className={cn("w-5 h-5 transition-transform duration-300", isActive && "scale-110")} />
                 <span className="font-medium">{item.label}</span>
@@ -216,17 +218,19 @@ export const Sidebar = ({ role, userName, userAvatar, featureState }: SidebarPro
         {/* User Profile */}
         <div className="mt-auto pt-4 border-t border-slate-200 relative">
           <button
-            onClick={() => setShowUserMenu(!showUserMenu)}
+            onClick={() => setShowUserMenu((prev) => !prev)}
             className="flex items-center gap-3 px-3 py-2 w-full rounded-xl hover:bg-slate-50 transition-colors"
           >
             <img
               src={resolvedAvatar}
               alt={userName}
+              loading="lazy"
+              decoding="async"
               className="w-10 h-10 rounded-full object-cover ring-2 ring-blue-100"
             />
             <div className="flex-1 min-w-0 text-left">
               <p className="font-medium text-slate-800 text-sm truncate">{userName}</p>
-              <p className="text-xs text-slate-500">{roleLabels[role]}</p>
+              <p className="text-xs text-slate-500">{ROLE_LABELS[role]}</p>
             </div>
             <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform", showUserMenu && "rotate-180")} />
           </button>

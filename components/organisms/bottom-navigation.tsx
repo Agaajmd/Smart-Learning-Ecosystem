@@ -6,7 +6,6 @@ import { usePathname, useRouter } from "next/navigation"
 import { 
   Home, 
   LayoutGrid, 
-  User, 
   BarChart3, 
   Users, 
   BookOpen, 
@@ -55,19 +54,37 @@ interface NavItem {
   disabledReason?: string
 }
 
+const ROLE_LABELS: Record<UserRole, string> = {
+  STUDENT: "Siswa",
+  EMPLOYEE: "Guru",
+  ADMIN: "Admin",
+  SUPER_ADMIN: "Kepala Sekolah",
+  PARENT: "Orang Tua",
+  CANTEEN_OWNER: "Pemilik Kantin",
+}
+
+const ROLE_COLORS: Record<UserRole, string> = {
+  STUDENT: "from-blue-500 to-cyan-500",
+  EMPLOYEE: "from-emerald-500 to-teal-500",
+  ADMIN: "from-orange-500 to-amber-500",
+  SUPER_ADMIN: "from-purple-500 to-indigo-500",
+  PARENT: "from-pink-500 to-rose-500",
+  CANTEEN_OWNER: "from-orange-500 to-red-500",
+}
+
 export const BottomNavigation = ({ role, userName, userAvatar, featureState }: BottomNavigationProps) => {
   const pathname = usePathname()
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const { logout } = useAuth()
   const logoutTimerRef = useRef<number | null>(null)
-  const resolvedAvatar = (() => {
+  const resolvedAvatar = useMemo(() => {
     const next = String(userAvatar || "").trim()
     if (!next || next === "null" || next === "undefined") {
       return "/placeholder-user.jpg"
     }
     return next
-  })()
+  }, [userAvatar])
 
   // Main bottom nav items (limited to 4)
   const getNavItems = (): NavItem[] => {
@@ -256,52 +273,36 @@ export const BottomNavigation = ({ role, userName, userAvatar, featureState }: B
     setIsOpen(false)
   }, [role, router])
 
-  const roleLabels: Record<UserRole, string> = {
-    STUDENT: "Siswa",
-    EMPLOYEE: "Guru",
-    ADMIN: "Admin",
-    SUPER_ADMIN: "Kepala Sekolah",
-    PARENT: "Orang Tua",
-    CANTEEN_OWNER: "Pemilik Kantin",
-  }
-
-  const roleColors: Record<UserRole, string> = {
-    STUDENT: "from-blue-500 to-cyan-500",
-    EMPLOYEE: "from-emerald-500 to-teal-500",
-    ADMIN: "from-orange-500 to-amber-500",
-    SUPER_ADMIN: "from-purple-500 to-indigo-500",
-    PARENT: "from-pink-500 to-rose-500",
-    CANTEEN_OWNER: "from-orange-500 to-red-500",
-  }
-
   return (
     <>
       {/* Bottom Sheet Menu - Always from bottom */}
       <BottomSheet open={isOpen} onOpenChange={setIsOpen}>
         <BottomSheetHandle />
         
-        <div className="px-4 pb-6 overflow-y-auto max-h-[80vh]">
+        <div className="px-4 pb-6 overflow-y-auto max-h-[80vh] perf-scroll-container">
           {/* User Profile Card */}
           <button
             onClick={handleProfileClick}
-            className="flex items-center gap-4 w-full p-4 rounded-2xl bg-gradient-to-r from-slate-50 to-slate-100 hover:from-slate-100 hover:to-slate-150 transition-all duration-200 active:scale-[0.98] mb-4"
+            className="flex items-center gap-4 w-full p-4 rounded-2xl bg-gradient-to-r from-slate-50 to-slate-100 hover:from-slate-100 hover:to-slate-150 transition-[background-color,transform,box-shadow] duration-200 active:scale-[0.98] mb-4"
           >
             <div className="relative">
               <img
                 src={resolvedAvatar}
                 alt={userName || "User"}
+                loading="lazy"
+                decoding="async"
                 className="w-14 h-14 rounded-2xl object-cover ring-2 ring-white shadow-lg"
               />
               <div className={cn(
                 "absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-gradient-to-br flex items-center justify-center ring-2 ring-white",
-                roleColors[role]
+                ROLE_COLORS[role]
               )}>
                 <div className="w-2 h-2 bg-white rounded-full" />
               </div>
             </div>
             <div className="flex-1 text-left">
               <p className="font-semibold text-slate-900 text-lg leading-tight">{userName || "User"}</p>
-              <p className="text-sm text-slate-500 mt-0.5">{roleLabels[role]}</p>
+              <p className="text-sm text-slate-500 mt-0.5">{ROLE_LABELS[role]}</p>
             </div>
             <ChevronRight className="w-5 h-5 text-slate-400" />
           </button>
@@ -334,7 +335,7 @@ export const BottomNavigation = ({ role, userName, userAvatar, featureState }: B
                   prefetch={false}
                   onClick={() => setIsOpen(false)}
                   className={cn(
-                    "flex flex-col items-center gap-2 p-3 rounded-2xl transition-all duration-200 active:scale-[0.95]",
+                    "flex flex-col items-center gap-2 p-3 rounded-2xl transition-[background-color,color,transform] duration-200 active:scale-[0.95]",
                     isActive
                       ? "bg-blue-50 text-blue-600"
                       : "bg-slate-50 hover:bg-slate-100 text-slate-600"
@@ -360,7 +361,7 @@ export const BottomNavigation = ({ role, userName, userAvatar, featureState }: B
           {/* Logout Button */}
           <button
             onClick={handleLogout}
-            className="flex items-center justify-center gap-3 w-full py-4 px-4 rounded-2xl bg-gradient-to-r from-red-50 to-rose-50 hover:from-red-100 hover:to-rose-100 border border-red-100 text-red-600 font-semibold transition-all duration-200 active:scale-[0.98]"
+            className="flex items-center justify-center gap-3 w-full py-4 px-4 rounded-2xl bg-gradient-to-r from-red-50 to-rose-50 hover:from-red-100 hover:to-rose-100 border border-red-100 text-red-600 font-semibold transition-[background-color,border-color,transform] duration-200 active:scale-[0.98]"
           >
             <LogOut className="w-5 h-5" />
             <span>Keluar dari Akun</span>
@@ -370,7 +371,7 @@ export const BottomNavigation = ({ role, userName, userAvatar, featureState }: B
 
       {/* Bottom Navigation Bar */}
       <nav className="fixed bottom-4 left-4 right-4 md:hidden z-40">
-        <div className="bg-white/95 backdrop-blur-xl shadow-lg shadow-slate-200/60 border border-slate-100 rounded-2xl px-2 py-2">
+        <div className="bg-white/95 backdrop-blur-xl perf-surface-blur shadow-lg shadow-slate-200/60 perf-heavy-shadow border border-slate-100 rounded-2xl px-2 py-2">
           <div className="flex items-center justify-around">
             {navItems.slice(0, 4).map((item) => {
               const isActive = isRouteActive(item)
@@ -382,7 +383,7 @@ export const BottomNavigation = ({ role, userName, userAvatar, featureState }: B
                     key={item.href}
                     type="button"
                     onClick={() => toast.info(item.disabledReason || "Fitur sedang dinonaktifkan")}
-                    className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl text-slate-400 bg-slate-50 transition-all duration-300"
+                    className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl text-slate-400 bg-slate-50 transition-[background-color,color] duration-300"
                   >
                     <Icon className="w-5 h-5" />
                     <span className="text-[10px] font-medium">{item.label}</span>
@@ -396,7 +397,7 @@ export const BottomNavigation = ({ role, userName, userAvatar, featureState }: B
                   href={item.href}
                   prefetch={false}
                   className={cn(
-                    "flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-all duration-300",
+                    "flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-[background-color,color,transform,box-shadow] duration-300",
                     isActive
                       ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-md shadow-blue-500/30"
                       : "text-slate-500 hover:text-slate-700 hover:bg-slate-50 active:scale-95",
@@ -410,7 +411,7 @@ export const BottomNavigation = ({ role, userName, userAvatar, featureState }: B
 
             <button
               onClick={() => setIsOpen(true)}
-              className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-all duration-300 active:scale-95"
+              className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-[background-color,color,transform] duration-300 active:scale-95"
             >
               <Menu className="w-5 h-5" />
               <span className="text-[10px] font-medium">Menu</span>

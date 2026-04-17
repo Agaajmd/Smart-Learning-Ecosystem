@@ -143,6 +143,32 @@ textarea {
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Shared performance classes for overlays/surfaces used across the app. */
+.perf-overlay-blur {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.perf-surface-blur {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.perf-heavy-shadow {
+  box-shadow: 0 16px 32px -18px rgb(15 23 42 / 0.3);
+}
+
+.perf-scroll-container {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.perf-list-item {
+  content-visibility: auto;
+  contain: layout paint style;
+  contain-intrinsic-size: 1px 112px;
+}
+
 /* Keep motion smooth while avoiding heavy composite work during scroll */
 .perf-scroll-section {
   content-visibility: auto;
@@ -538,10 +564,84 @@ body[vaul-drawer-wrapper] {
 }
 
 @media (pointer: coarse), (max-width: 768px) {
+  .transition-all {
+    transition-property: color, background-color, border-color, opacity, transform, box-shadow;
+  }
+
+  .backdrop-blur-2xl {
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+  }
+
+  .backdrop-blur-xl,
+  .backdrop-blur-lg {
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+  }
+
+  .backdrop-blur-sm {
+    backdrop-filter: blur(4px) !important;
+    -webkit-backdrop-filter: blur(4px) !important;
+  }
+
+  .shadow-2xl,
+  .shadow-xl {
+    box-shadow: 0 14px 30px -18px rgb(15 23 42 / 0.24) !important;
+  }
+
+  .shadow-lg {
+    box-shadow: 0 10px 22px -14px rgb(15 23 42 / 0.22) !important;
+  }
+
   /* Lower blur cost on mobile GPUs to reduce scroll jank. */
   .glass,
   .glass-dark {
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .perf-overlay-blur {
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
+  .perf-surface-blur {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .perf-heavy-shadow {
+    box-shadow: 0 10px 24px -14px rgb(15 23 42 / 0.26);
+  }
+
+  /* Decorative infinite animations are a major source of repaint on mobile. */
+  .perf-decorative-motion {
+    animation: none;
+  }
+
+  .animate-pulse {
+    animation-duration: 2.4s;
+  }
+
+  .animate-in {
+    animation-duration: 220ms !important;
+  }
+
+  .animate-out {
+    animation-duration: 180ms !important;
+  }
+
+  .page-enter {
+    animation: none;
+  }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .perf-overlay-blur {
+    background-color: rgb(15 23 42 / 0.56);
+  }
+
+  .perf-surface-blur {
+    background-color: rgb(255 255 255 / 0.95);
   }
 }

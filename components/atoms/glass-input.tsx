@@ -20,7 +20,7 @@ export const GlassInput = ({ className, label, id, ...props }: GlassInputProps) 
           "bg-white/80 backdrop-blur-sm border border-slate-200",
           "text-slate-800 placeholder:text-slate-400",
           "focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 focus:bg-white",
-          "transition-all duration-300 ease-out",
+          "transition-[color,background-color,border-color,box-shadow] duration-300 ease-out",
           "hover:border-slate-300",
           className,
         )}

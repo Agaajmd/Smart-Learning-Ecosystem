@@ -138,9 +138,6 @@ export default function LoginPage() {
               </GlassButton>
             </form>
 
-            <div className="text-center mt-5 pt-5 border-t border-slate-100">
-              <p className="text-slate-500 text-sm">Akun dibuat oleh admin atau super admin.</p>
-            </div>
           </GlassCard>
 
           {/* Footer */}
@@ -175,15 +172,15 @@ export default function LoginPage() {
           </p>
           <div className="mt-8 grid grid-cols-3 gap-4">
             <div className="bg-white/10 backdrop-blur rounded-xl p-4">
-              <p className="text-2xl font-bold">500+</p>
+              <p className="text-2xl font-bold">1+</p>
               <p className="text-xs text-white/70">Siswa</p>
             </div>
             <div className="bg-white/10 backdrop-blur rounded-xl p-4">
-              <p className="text-2xl font-bold">50+</p>
+              <p className="text-2xl font-bold">1+</p>
               <p className="text-xs text-white/70">Guru</p>
             </div>
             <div className="bg-white/10 backdrop-blur rounded-xl p-4">
-              <p className="text-2xl font-bold">20+</p>
+              <p className="text-2xl font-bold">1+</p>
               <p className="text-xs text-white/70">Kelas</p>
             </div>
           </div>

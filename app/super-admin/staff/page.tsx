@@ -148,12 +148,27 @@ export default function SuperAdminStaff() {
   }, [filteredByTypeStaff, debouncedSearchQuery])
 
   const teacherScheduleStats = useMemo(() => {
+    const aggregateByTeacher = new Map<string, { totalClasses: number; classIds: Set<string> }>()
+
+    for (const schedule of schedules) {
+      const existing = aggregateByTeacher.get(schedule.teacherId)
+      if (existing) {
+        existing.totalClasses += 1
+        existing.classIds.add(schedule.classId)
+      } else {
+        aggregateByTeacher.set(schedule.teacherId, {
+          totalClasses: 1,
+          classIds: new Set([schedule.classId]),
+        })
+      }
+    }
+
     const statsMap = new Map<string, { totalClasses: number; uniqueClasses: number }>()
     for (const teacher of teachers) {
-      const staffSchedules = schedules.filter((schedule) => schedule.teacherId === teacher.id)
+      const aggregated = aggregateByTeacher.get(teacher.id)
       statsMap.set(teacher.id, {
-        totalClasses: staffSchedules.length,
-        uniqueClasses: new Set(staffSchedules.map((schedule) => schedule.classId)).size,
+        totalClasses: aggregated?.totalClasses ?? 0,
+        uniqueClasses: aggregated?.classIds.size ?? 0,
       })
     }
     return statsMap
@@ -425,7 +440,7 @@ export default function SuperAdminStaff() {
           </div>
         </GlassCard>
 
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 perf-scroll-container">
           <div className="flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs sm:text-sm whitespace-nowrap">
             <Filter className="w-4 h-4" />
             Filter Staff
@@ -461,13 +476,13 @@ export default function SuperAdminStaff() {
               return (
                 <div
                   key={staff.id}
-                  className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors gap-3 ${teacher ? "cursor-pointer" : ""}`}
+                  className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors gap-3 perf-list-item ${teacher ? "cursor-pointer" : ""}`}
                   onClick={() => {
                     if (teacher) router.push(`/super-admin/staff/${encodeStaffId(staff.id)}`)
                   }}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <img src={staff.avatar} alt={staff.name} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-slate-200 shrink-0" />
+                    <img src={staff.avatar} alt={staff.name} loading="lazy" decoding="async" className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-slate-200 shrink-0" />
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold text-slate-800 text-sm sm:text-base truncate">{staff.name}</p>
                       <p className="text-xs sm:text-sm text-slate-500 truncate">WA: {staff.phone || "-"}</p>

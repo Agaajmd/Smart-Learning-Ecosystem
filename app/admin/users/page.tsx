@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import { DashboardLayout } from "@/components/templates/dashboard-layout"
 import { RouteLoading } from "@/components/templates/route-loading"
 import { GlassCard } from "@/components/molecules/glass-card"
@@ -26,6 +26,69 @@ import {
 type UserType = "all" | "students" | "employees" | "parents" | "admins" | "canteens"
 type AppUser = (User | Student | Employee) & { isActive?: boolean }
 
+interface UserRowProps {
+  user: AppUser
+  getRoleColor: (role: string) => string
+  getRoleIcon: (role: string) => ReactNode
+  resolveAvatar: (value: unknown) => string
+  onOpenUser: (user: AppUser) => void
+  onOpenDelete: (user: AppUser) => void
+}
+
+const UserRow = memo(function UserRow({
+  user,
+  getRoleColor,
+  getRoleIcon,
+  resolveAvatar,
+  onOpenUser,
+  onOpenDelete,
+}: UserRowProps) {
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors gap-3 perf-list-item">
+      <div className="flex items-center gap-3 min-w-0">
+        <img
+          src={resolveAvatar(user.avatar)}
+          alt={user.name}
+          loading="lazy"
+          decoding="async"
+          className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-slate-200 shrink-0"
+        />
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-slate-800 text-sm sm:text-base truncate">{user.name}</p>
+          <p className="text-xs sm:text-sm text-slate-500 truncate">{user.email}</p>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3">
+        <span className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs border ${getRoleColor(user.role)}`}>
+          {getRoleIcon(user.role)}
+          <span className="hidden xs:inline">{user.role.replace("_", " ")}</span>
+        </span>
+
+        <span className={`px-2 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs border ${user.isActive === false ? "bg-slate-100 text-slate-600 border-slate-300" : "bg-emerald-100 text-emerald-700 border-emerald-200"}`}>
+          {user.isActive === false ? "Nonaktif" : "Aktif"}
+        </span>
+
+        <button
+          onClick={() => onOpenUser(user)}
+          className="p-1.5 sm:p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-colors"
+        >
+          <Eye className="w-4 h-4 text-slate-600" />
+        </button>
+
+        {user.role !== "SUPER_ADMIN" && (
+          <button
+            onClick={() => onOpenDelete(user)}
+            className="p-1.5 sm:p-2 rounded-xl bg-white border border-red-200 hover:bg-red-50 hover:border-red-300 transition-colors"
+          >
+            <Trash2 className="w-4 h-4 text-red-600" />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+})
+
 
 export default function AdminUsersPage() {
   const [admin, setAdmin] = useState<any>(null)
@@ -40,10 +103,10 @@ export default function AdminUsersPage() {
   const [isDeleting, setIsDeleting] = useState(false)
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 250)
 
-  const resolveAvatar = (value: unknown) => {
+  const resolveAvatar = useCallback((value: unknown) => {
     const next = String(value || "").trim()
     return next || "/placeholder-user.jpg"
-  }
+  }, [])
 
   useEffect(() => {
     const load = async () => {
@@ -75,6 +138,24 @@ export default function AdminUsersPage() {
     [allUsers],
   )
 
+  const roleCounts = useMemo(() => {
+    let students = 0
+    let employees = 0
+    let parents = 0
+    let admins = 0
+    let canteens = 0
+
+    for (const user of allUsers) {
+      if (user.role === "STUDENT") students += 1
+      else if (user.role === "EMPLOYEE") employees += 1
+      else if (user.role === "PARENT") parents += 1
+      else if (user.role === "CANTEEN_OWNER") canteens += 1
+      else if (user.role === "ADMIN" || user.role === "SUPER_ADMIN") admins += 1
+    }
+
+    return { students, employees, parents, admins, canteens }
+  }, [allUsers])
+
   const filters: { id: UserType; label: string; icon: typeof GraduationCap; count: number }[] = useMemo(
     () => [
       {
@@ -87,34 +168,34 @@ export default function AdminUsersPage() {
         id: "students",
         label: "Students",
         icon: GraduationCap,
-        count: allUsers.filter((u) => u.role === "STUDENT").length,
+        count: roleCounts.students,
       },
       {
         id: "employees",
         label: "Teachers",
         icon: Briefcase,
-        count: allUsers.filter((u) => u.role === "EMPLOYEE").length,
+        count: roleCounts.employees,
       },
       {
         id: "parents",
         label: "Parents",
         icon: Users,
-        count: allUsers.filter((u) => u.role === "PARENT").length,
+        count: roleCounts.parents,
       },
       {
         id: "admins",
         label: "Staff",
         icon: Shield,
-        count: allUsers.filter((u) => u.role === "ADMIN" || u.role === "SUPER_ADMIN").length,
+        count: roleCounts.admins,
       },
       {
         id: "canteens",
         label: "Canteen",
         icon: Store,
-        count: allUsers.filter((u) => u.role === "CANTEEN_OWNER").length,
+        count: roleCounts.canteens,
       },
     ],
-    [allUsers, totalUsersCount],
+    [roleCounts, totalUsersCount],
   )
 
   const users = useMemo(() => {
@@ -171,7 +252,7 @@ export default function AdminUsersPage() {
     }
   }
 
-  const getRoleIcon = (role: string) => {
+  const getRoleIcon = useCallback((role: string) => {
     switch (role) {
       case "STUDENT":
         return <GraduationCap className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -188,9 +269,9 @@ export default function AdminUsersPage() {
       default:
         return null
     }
-  }
+  }, [])
 
-  const getRoleColor = (role: string) => {
+  const getRoleColor = useCallback((role: string) => {
     switch (role) {
       case "STUDENT":
         return "bg-blue-100 text-blue-700 border-blue-200"
@@ -207,7 +288,17 @@ export default function AdminUsersPage() {
       default:
         return "bg-gray-100 text-gray-700 border-gray-200"
     }
-  }
+  }, [])
+
+  const handleOpenUserModal = useCallback((user: AppUser) => {
+    setSelectedUser(user)
+    setShowUserModal(true)
+  }, [])
+
+  const handleOpenDeleteModal = useCallback((user: AppUser) => {
+    setUserToDelete(user)
+    setShowDeleteModal(true)
+  }, [])
 
   if (isLoading) {
     return <RouteLoading />
@@ -245,7 +336,7 @@ export default function AdminUsersPage() {
           </div>
         </GlassCard>
 
-        <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-2 scrollbar-hide perf-scroll-container -mx-4 px-4 sm:mx-0 sm:px-0">
           {filters.map((filter) => {
             const Icon = filter.icon
             return (
@@ -275,57 +366,15 @@ export default function AdminUsersPage() {
               <EmptySkeleton rows={4} className="py-4" />
             ) : (
               users.map((user) => (
-                <div
+                <UserRow
                   key={user.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors gap-3"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <img
-                      src={resolveAvatar(user.avatar)}
-                      alt={user.name}
-                      className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-slate-200 shrink-0"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-slate-800 text-sm sm:text-base truncate">{user.name}</p>
-                      <p className="text-xs sm:text-sm text-slate-500 truncate">{user.email}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3">
-                    <span
-                      className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs border ${getRoleColor(user.role)}`}
-                    >
-                      {getRoleIcon(user.role)}
-                      <span className="hidden xs:inline">{user.role.replace("_", " ")}</span>
-                    </span>
-
-                    <span className={`px-2 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs border ${user.isActive === false ? "bg-slate-100 text-slate-600 border-slate-300" : "bg-emerald-100 text-emerald-700 border-emerald-200"}`}>
-                      {user.isActive === false ? "Nonaktif" : "Aktif"}
-                    </span>
-
-                    <button
-                      onClick={() => {
-                        setSelectedUser(user)
-                        setShowUserModal(true)
-                      }}
-                      className="p-1.5 sm:p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-colors"
-                    >
-                      <Eye className="w-4 h-4 text-slate-600" />
-                    </button>
-
-                    {user.role !== "SUPER_ADMIN" && (
-                      <button
-                        onClick={() => {
-                          setUserToDelete(user)
-                          setShowDeleteModal(true)
-                        }}
-                        className="p-1.5 sm:p-2 rounded-xl bg-white border border-red-200 hover:bg-red-50 hover:border-red-300 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4 text-red-600" />
-                      </button>
-                    )}
-                  </div>
-                </div>
+                  user={user}
+                  getRoleColor={getRoleColor}
+                  getRoleIcon={getRoleIcon}
+                  resolveAvatar={resolveAvatar}
+                  onOpenUser={handleOpenUserModal}
+                  onOpenDelete={handleOpenDeleteModal}
+                />
               ))
             )}
           </div>
@@ -339,6 +388,8 @@ export default function AdminUsersPage() {
                 <img
                   src={resolveAvatar(selectedUser.avatar)}
                   alt={selectedUser.name}
+                  loading="lazy"
+                  decoding="async"
                   className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-2 border-slate-200"
                 />
                 <div className="min-w-0 flex-1">

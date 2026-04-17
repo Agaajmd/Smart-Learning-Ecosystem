@@ -29,8 +29,7 @@ export const GlassModal = ({
   const modalRef = useRef<HTMLDivElement>(null)
   const closeTimerRef = useRef<number | null>(null)
   const hideTimerRef = useRef<number | null>(null)
-  const animationFrameOneRef = useRef<number | null>(null)
-  const animationFrameTwoRef = useRef<number | null>(null)
+  const animationFrameRef = useRef<number | null>(null)
 
   // Handle mounting for portal
   useEffect(() => {
@@ -42,11 +41,8 @@ export const GlassModal = ({
     if (isOpen) {
       setIsVisible(true)
       document.body.style.overflow = 'hidden'
-      // Trigger animation after mount with slight delay for smoothness
-      animationFrameOneRef.current = requestAnimationFrame(() => {
-        animationFrameTwoRef.current = requestAnimationFrame(() => {
-          setIsAnimating(true)
-        })
+      animationFrameRef.current = requestAnimationFrame(() => {
+        setIsAnimating(true)
       })
     } else {
       setIsAnimating(false)
@@ -60,13 +56,9 @@ export const GlassModal = ({
         window.clearTimeout(hideTimerRef.current)
         hideTimerRef.current = null
       }
-      if (animationFrameOneRef.current !== null) {
-        window.cancelAnimationFrame(animationFrameOneRef.current)
-        animationFrameOneRef.current = null
-      }
-      if (animationFrameTwoRef.current !== null) {
-        window.cancelAnimationFrame(animationFrameTwoRef.current)
-        animationFrameTwoRef.current = null
+      if (animationFrameRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameRef.current)
+        animationFrameRef.current = null
       }
       document.body.style.overflow = ''
     }
@@ -96,13 +88,9 @@ export const GlassModal = ({
         window.clearTimeout(hideTimerRef.current)
         hideTimerRef.current = null
       }
-      if (animationFrameOneRef.current !== null) {
-        window.cancelAnimationFrame(animationFrameOneRef.current)
-        animationFrameOneRef.current = null
-      }
-      if (animationFrameTwoRef.current !== null) {
-        window.cancelAnimationFrame(animationFrameTwoRef.current)
-        animationFrameTwoRef.current = null
+      if (animationFrameRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameRef.current)
+        animationFrameRef.current = null
       }
     }
   }, [])
@@ -150,7 +138,7 @@ export const GlassModal = ({
       {/* Backdrop with smooth fade */}
       <div 
         className={cn(
-          "absolute inset-0 bg-black/50 backdrop-blur-[2px]",
+          "absolute inset-0 bg-black/50 backdrop-blur-[2px] perf-overlay-blur",
           "transition-opacity duration-200 ease-out",
           isAnimating ? "opacity-100" : "opacity-0"
         )}
@@ -168,8 +156,7 @@ export const GlassModal = ({
           "rounded-2xl sm:rounded-3xl",
           "shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)]",
           "border border-slate-200/80",
-          // Smooth spring-like animation
-          "transition-all duration-200 ease-[cubic-bezier(0.32,0.72,0,1)]",
+          "transition-[opacity,transform] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)]",
           isAnimating 
             ? "opacity-100 scale-100 translate-y-0" 
             : "opacity-0 scale-[0.96] translate-y-2",
@@ -177,7 +164,7 @@ export const GlassModal = ({
           "overflow-hidden flex flex-col",
           className,
         )}
-        style={{ willChange: 'transform, opacity' }}
+        style={{ willChange: isAnimating ? 'transform, opacity' : 'auto' }}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-100 bg-slate-50/50">
@@ -194,7 +181,7 @@ export const GlassModal = ({
             className={cn(
               "p-2 rounded-xl",
               "bg-slate-100 hover:bg-slate-200 active:bg-slate-300",
-              "transition-all duration-150 ease-out",
+              "transition-[background-color,color,transform] duration-150 ease-out",
               "ml-auto shrink-0",
               "focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2",
               "group"
@@ -206,7 +193,7 @@ export const GlassModal = ({
         </div>
         
         {/* Content */}
-        <div className="px-4 sm:px-6 py-4 sm:py-5 overflow-y-auto flex-1 overscroll-contain">
+        <div className="px-4 sm:px-6 py-4 sm:py-5 overflow-y-auto flex-1 overscroll-contain perf-scroll-container">
           {children}
         </div>
       </div>
