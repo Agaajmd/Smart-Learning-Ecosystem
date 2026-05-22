@@ -3,24 +3,22 @@ import type { Order, OrderItem } from "@/lib/data-model"
 import { getAllDbCanteens } from "@/lib/server/google-sheets-canteens"
 import { createDbOrder, getAllDbOrdersFromSheet, migrateDbOrdersToSheet } from "@/lib/server/google-sheets-orders"
 import { getAllDbProductsFromSheet, updateDbProductById } from "@/lib/server/google-sheets-products"
-import { getAllDbWalletTopups } from "@/lib/server/google-sheets-wallet-topups"
 import { getSessionUser } from "@/lib/server/session-user"
 import {
   getDbCanteens,
   getDbOrders,
   getDbProducts,
-  getDbWalletTopups,
   setDbCanteens,
   setDbOrders,
   setDbProducts,
 } from "@/lib/server/persistent-store"
+import { calculateWalletSnapshot } from "@/lib/server/wallet-balance"
 
 type CheckoutItemInput = {
   productId: string
   quantity: number
 }
 
-const CANCELED_ORDER_STATUS = "CANCELLED"
 const ALLOWED_ORDERER_ROLES = new Set(["STUDENT", "EMPLOYEE", "PARENT", "ADMIN", "SUPER_ADMIN"])
 
 const loadCanteensFromSheetOrStore = async () => {
@@ -67,30 +65,6 @@ const loadProductsFromSheetOrStore = async () => {
   }
 
   return getDbProducts()
-}
-
-const calculateApprovedTopupAmount = async (userId: string) => {
-  const allTopups = await (async () => {
-    try {
-      return await getAllDbWalletTopups()
-    } catch {
-      return getDbWalletTopups().map((item) => ({
-        userId: item.userId,
-        amount: item.amount,
-        status: item.status,
-      }))
-    }
-  })()
-
-  return allTopups
-    .filter((item) => item.userId === userId && item.status === "APPROVED")
-    .reduce((acc, item) => acc + Number(item.amount || 0), 0)
-}
-
-const calculateSpentAmount = (userId: string, orders: Order[]) => {
-  return orders
-    .filter((order) => order.customerId === userId && order.status !== CANCELED_ORDER_STATUS)
-    .reduce((acc, order) => acc + Number(order.totalAmount || 0), 0)
 }
 
 export async function GET() {
@@ -209,9 +183,8 @@ export async function POST(request: Request) {
       { status: 503 },
     )
   }
-  const approvedTopupAmount = await calculateApprovedTopupAmount(user.id)
-  const spentAmount = calculateSpentAmount(user.id, existingOrders)
-  const walletBalance = Math.max(0, approvedTopupAmount - spentAmount)
+  const walletSnapshot = await calculateWalletSnapshot(user.id)
+  const walletBalance = walletSnapshot.walletBalance
 
   if (totalAmount > walletBalance) {
     return NextResponse.json(

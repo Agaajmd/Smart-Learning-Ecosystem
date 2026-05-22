@@ -24,6 +24,14 @@ export default function ParentFinancePage() {
   const [selectedChild, setSelectedChild] = useState<Student | null>(null)
   const [payments, setPayments] = useState<StudentPayment[]>([])
   const [sppInfo, setSppInfo] = useState<any>(null)
+  const [walletInfo, setWalletInfo] = useState<{
+    walletBalance: number
+    pendingTopupAmount: number
+    approvedTopupAmount: number
+    spentAmount: number
+    spentSppAmount: number
+    spentCanteenAmount: number
+  } | null>(null)
   const [isPayingSpp, setIsPayingSpp] = useState(false)
   const [filterStatus, setFilterStatus] = useState<string>("all")
   const [childClassName, setChildClassName] = useState("")
@@ -43,6 +51,18 @@ export default function ParentFinancePage() {
         if (data.selectedChild) setSelectedChild(data.selectedChild)
         setPayments(data.payments || [])
         setSppInfo(data.sppInfo || null)
+        setWalletInfo(
+          data.walletInfo
+            ? {
+                walletBalance: Number(data.walletInfo.walletBalance || 0),
+                pendingTopupAmount: Number(data.walletInfo.pendingTopupAmount || 0),
+                approvedTopupAmount: Number(data.walletInfo.approvedTopupAmount || 0),
+                spentAmount: Number(data.walletInfo.spentAmount || 0),
+                spentSppAmount: Number(data.walletInfo.spentSppAmount || 0),
+                spentCanteenAmount: Number(data.walletInfo.spentCanteenAmount || 0),
+              }
+            : null,
+        )
         setChildClassName(data.childClass?.name || data.selectedChild?.classId || "-")
       } catch {
         setParent(null)
@@ -94,6 +114,11 @@ export default function ParentFinancePage() {
   const totalPayments = payments.reduce((acc, p) => acc + p.amount, 0)
   const paidPayments = payments.filter(p => p.status === "PAID").reduce((acc, p) => acc + p.amount, 0)
   const unpaidPayments = payments.filter(p => p.status !== "PAID").reduce((acc, p) => acc + p.amount, 0)
+  const walletBalance = Number(walletInfo?.walletBalance || 0)
+  const pendingTopupAmount = Number(walletInfo?.pendingTopupAmount || 0)
+  const sppAmount = Number(sppInfo?.amount || 0)
+  const hasEnoughWalletBalance = sppAmount > 0 && walletBalance >= sppAmount
+  const canPaySpp = Boolean(sppInfo?.isConfigured) && sppInfo?.status !== "PAID" && hasEnoughWalletBalance
 
   return (
     <DashboardLayout role="PARENT" userName={parent.name} userAvatar={parent.avatar}>
@@ -176,10 +201,14 @@ export default function ParentFinancePage() {
               <p className="text-sm text-slate-500">SPP Grade {sppInfo?.grade || "-"}</p>
               <p className="text-2xl font-bold text-slate-800">Rp {Number(sppInfo?.amount || 0).toLocaleString("id-ID")}</p>
               <p className="text-xs text-slate-500 mt-1">
-                {sppInfo?.isConfigured
-                  ? `Jatuh tempo tiap tanggal ${sppInfo?.dueDay || "-"}`
-                  : "Default SPP belum dikonfigurasi super admin"}
+                Saldo dompet: Rp {walletBalance.toLocaleString("id-ID")}
+                {pendingTopupAmount > 0 ? ` • Menunggu topup Rp ${pendingTopupAmount.toLocaleString("id-ID")}` : ""}
               </p>
+              {!hasEnoughWalletBalance && sppInfo?.isConfigured && sppInfo?.status !== "PAID" ? (
+                <p className="text-xs text-rose-600 mt-1">
+                  Saldo dompet belum cukup. Lakukan topup dan tunggu persetujuan admin.
+                </p>
+              ) : null}
             </div>
             <div className="flex flex-col sm:items-end gap-2">
               <span
@@ -197,10 +226,18 @@ export default function ParentFinancePage() {
               <button
                 type="button"
                 onClick={handlePaySpp}
-                disabled={isPayingSpp || !sppInfo?.isConfigured || sppInfo?.status === "PAID"}
+                disabled={isPayingSpp || !canPaySpp}
                 className="px-4 py-2 rounded-xl bg-indigo-500 text-white text-sm font-medium hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {isPayingSpp ? "Memproses..." : sppInfo?.status === "PAID" ? "Sudah Dibayar" : "Bayar SPP Sekarang"}
+                {isPayingSpp
+                  ? "Memproses..."
+                  : sppInfo?.status === "PAID"
+                    ? "Sudah Dibayar"
+                    : !sppInfo?.isConfigured
+                      ? "SPP Belum Dikonfigurasi"
+                      : !hasEnoughWalletBalance
+                        ? "Saldo Dompet Kurang"
+                        : "Bayar SPP Sekarang"}
               </button>
             </div>
           </div>

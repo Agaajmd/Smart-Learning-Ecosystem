@@ -15,7 +15,6 @@ import {
   GraduationCap, 
   Briefcase, 
   School,
-  Award,
   Target,
   BarChart3,
   PieChart,
@@ -95,10 +94,9 @@ export default function SuperAdminDashboard() {
   const profitMargin = totalIncome > 0 ? ((profit / totalIncome) * 100).toFixed(1) : "0.0"
 
   const quickStats = [
-    { icon: GraduationCap, label: "Total Siswa", value: students.length, change: "+12", color: "text-blue-600", bgColor: "bg-blue-50" },
-    { icon: Briefcase, label: "Total Guru", value: employees.length, change: "+3", color: "text-emerald-600", bgColor: "bg-emerald-50" },
-    { icon: School, label: "Total Kelas", value: classes.length, change: "0", color: "text-purple-600", bgColor: "bg-purple-50" },
-    { icon: Award, label: "Prestasi", value: 24, change: "+5", color: "text-amber-600", bgColor: "bg-amber-50" },
+    { icon: GraduationCap, label: "Total Siswa", value: students.length, color: "text-blue-600", bgColor: "bg-blue-50" },
+    { icon: Briefcase, label: "Total Guru", value: employees.length, color: "text-emerald-600", bgColor: "bg-emerald-50" },
+    { icon: School, label: "Total Kelas", value: classes.length, color: "text-purple-600", bgColor: "bg-purple-50" },
   ]
 
   const financialStats = [
@@ -178,18 +176,13 @@ export default function SuperAdminDashboard() {
         )}
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {quickStats.map((stat) => {
             const Icon = stat.icon
             return (
               <div key={stat.label} className={`${stat.bgColor} rounded-2xl p-4 border border-slate-100`}>
                 <div className="flex items-center justify-between mb-2">
                   <Icon className={`w-5 h-5 ${stat.color}`} />
-                  {stat.change !== "0" && (
-                    <span className={`text-xs font-medium ${stat.change.startsWith("+") ? "text-green-600" : "text-red-600"}`}>
-                      {stat.change}
-                    </span>
-                  )}
                 </div>
                 <p className="text-2xl font-bold text-slate-800">{stat.value}</p>
                 <p className="text-xs text-slate-600">{stat.label}</p>
@@ -209,10 +202,10 @@ export default function SuperAdminDashboard() {
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { label: "Nilai Akademik", value: performance.academicScore, icon: GraduationCap, color: "blue" },
-              { label: "Kehadiran", value: performance.attendanceRate, icon: CheckCircle2, color: "green" },
-              { label: "Kinerja Guru", value: performance.teacherPerformance, icon: Star, color: "amber" },
-              { label: "Kepuasan Ortu", value: performance.parentSatisfaction, icon: Users, color: "purple" },
+              { label: "Nilai Akademik", value: performance.academicScore, icon: GraduationCap, strokeClass: "text-blue-500" },
+              { label: "Kehadiran", value: performance.attendanceRate, icon: CheckCircle2, strokeClass: "text-green-500" },
+              { label: "Kinerja Guru", value: performance.teacherPerformance, icon: Star, strokeClass: "text-amber-500" },
+              { label: "Kepuasan Ortu", value: performance.parentSatisfaction, icon: Users, strokeClass: "text-purple-500" },
             ].map((metric) => {
               const Icon = metric.icon
               return (
@@ -237,7 +230,7 @@ export default function SuperAdminDashboard() {
                         fill="none"
                         strokeDasharray={`${(metric.value / 100) * 226} 226`}
                         strokeLinecap="round"
-                        className={`text-${metric.color}-500`}
+                        className={metric.strokeClass}
                       />
                     </svg>
                     <div className="absolute inset-0 flex items-center justify-center">

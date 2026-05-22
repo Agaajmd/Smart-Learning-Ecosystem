@@ -4,10 +4,9 @@ import {
   getAllDbWalletTopups,
   type WalletTopupRecord,
 } from "@/lib/server/google-sheets-wallet-topups"
-import { getAllDbOrdersFromSheet, migrateDbOrdersToSheet } from "@/lib/server/google-sheets-orders"
 import { getSessionUser } from "@/lib/server/session-user"
 import { logAudit } from "@/lib/server/audit-log"
-import { getDbOrders, getDbWalletTopups, setDbWalletTopups } from "@/lib/server/persistent-store"
+import { getDbWalletTopups, setDbWalletTopups } from "@/lib/server/persistent-store"
 import {
   getSchoolWalletMethodMeta,
   SCHOOL_WALLET_QRIS_IMAGE_PATH,
@@ -17,6 +16,7 @@ import {
 import type { WalletTopup, WalletTopupMethod } from "@/lib/data-model"
 import { createDbMediaAssetFromDataUrl } from "@/lib/server/google-sheets-media-assets"
 import { normalizeDriveMediaUrl } from "@/lib/google-drive"
+import { calculateWalletSnapshot } from "@/lib/server/wallet-balance"
 
 const ENABLED_ROLES = new Set(["STUDENT", "EMPLOYEE", "PARENT", "SUPER_ADMIN"])
 
@@ -46,24 +46,6 @@ function sortByRequestedAtDesc<T extends { requestedAt?: string }>(items: T[]) {
 
 function loadWalletTopupsFromStore(): WalletTopup[] {
   return getDbWalletTopups()
-}
-
-async function loadOrdersForWalletSpend() {
-  try {
-    const fromSheet = await getAllDbOrdersFromSheet()
-    if (fromSheet.length > 0) {
-      return fromSheet
-    }
-
-    const localOrders = getDbOrders()
-    if (localOrders.length === 0) {
-      return fromSheet
-    }
-
-    return await migrateDbOrdersToSheet(localOrders)
-  } catch {
-    return getDbOrders()
-  }
 }
 
 async function normalizeTopupProofUrl(input: unknown, userId: string) {
@@ -101,30 +83,18 @@ export async function GET() {
   const userTopups = sortByRequestedAtDesc(
     allTopups.filter((item) => item.userId === sessionUser.id),
   )
-
-  const approvedAmount = userTopups
-    .filter((item) => item.status === "APPROVED")
-    .reduce((acc, item) => acc + Number(item.amount || 0), 0)
-
-  const ordersSource = await loadOrdersForWalletSpend()
-  const spentAmount = ordersSource
-    .filter((order) => order.customerId === sessionUser.id && order.status !== "CANCELLED")
-    .reduce((acc, order) => acc + Number(order.totalAmount || 0), 0)
-
-  const walletBalance = Math.max(0, approvedAmount - spentAmount)
-
-  const pendingAmount = userTopups
-    .filter((item) => item.status === "PENDING")
-    .reduce((acc, item) => acc + Number(item.amount || 0), 0)
+  const walletSnapshot = await calculateWalletSnapshot(sessionUser.id)
 
   return NextResponse.json({
     methods: SCHOOL_WALLET_TOPUP_METHODS,
     qrisImagePath: SCHOOL_WALLET_QRIS_IMAGE_PATH,
     topups: userTopups,
-    walletBalance,
-    approvedAmount,
-    spentAmount,
-    pendingAmount,
+    walletBalance: walletSnapshot.walletBalance,
+    approvedAmount: walletSnapshot.approvedTopupAmount,
+    spentAmount: walletSnapshot.spentAmount,
+    spentCanteenAmount: walletSnapshot.spentCanteenAmount,
+    spentSppAmount: walletSnapshot.spentSppAmount,
+    pendingAmount: walletSnapshot.pendingTopupAmount,
   })
 }
 

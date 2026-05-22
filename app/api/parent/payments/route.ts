@@ -21,6 +21,7 @@ import {
 } from "@/lib/server/persistent-store"
 import { logAudit } from "@/lib/server/audit-log"
 import { loadDbParentChildLinksWithMigration } from "@/lib/server/google-sheets-parent-children"
+import { calculateWalletSnapshot } from "@/lib/server/wallet-balance"
 
 function normalizeGrade(value: unknown) {
   return String(value || "").trim().toUpperCase()
@@ -135,6 +136,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ payment: existingPayment, alreadyPaid: true })
   }
 
+  const walletSnapshot = await calculateWalletSnapshot(sessionUser.id)
+  if (currentDefault.amount > walletSnapshot.walletBalance) {
+    logAudit({
+      actorId: sessionUser.id,
+      action: "UPDATE",
+      entityName: "student_payment_wallet_guard",
+      entityId: existingPayment?.id || `pay-spp-${child.id}-${periodKey}`,
+      oldValue: {
+        walletBalance: walletSnapshot.walletBalance,
+        approvedTopupAmount: walletSnapshot.approvedTopupAmount,
+        pendingTopupAmount: walletSnapshot.pendingTopupAmount,
+        spentAmount: walletSnapshot.spentAmount,
+      },
+      newValue: {
+        result: "INSUFFICIENT_BALANCE",
+        requiredAmount: currentDefault.amount,
+        studentId: child.id,
+        semester: periodKey,
+      },
+    })
+
+    return NextResponse.json(
+      {
+        error: `Saldo dompet tidak cukup untuk membayar SPP. Saldo tersedia: Rp ${walletSnapshot.walletBalance.toLocaleString("id-ID")}`,
+      },
+      { status: 400 },
+    )
+  }
+
   const paidDate = new Date().toISOString()
 
   try {
@@ -146,6 +176,8 @@ export async function POST(request: Request) {
         paidDate,
         status: "PAID",
         description,
+        paidByUserId: sessionUser.id,
+        paidVia: "WALLET",
       })
 
       const nextPayments = payments.map((payment) => (payment.id === existingPayment.id ? updated : payment))
@@ -157,7 +189,10 @@ export async function POST(request: Request) {
         entityName: "student_payment",
         entityId: updated.id,
         oldValue: existingPayment,
-        newValue: updated,
+        newValue: {
+          ...updated,
+          walletSnapshot,
+        },
       })
 
       return NextResponse.json({ payment: updated, alreadyPaid: false })
@@ -173,6 +208,8 @@ export async function POST(request: Request) {
       paidDate,
       status: "PAID",
       semester: periodKey,
+      paidByUserId: sessionUser.id,
+      paidVia: "WALLET",
     })
 
     setDbPayments([...payments, created])
@@ -183,7 +220,10 @@ export async function POST(request: Request) {
       entityName: "student_payment",
       entityId: created.id,
       oldValue: null,
-      newValue: created,
+      newValue: {
+        ...created,
+        walletSnapshot,
+      },
     })
 
     return NextResponse.json({ payment: created, alreadyPaid: false }, { status: 201 })

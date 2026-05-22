@@ -34,6 +34,7 @@ type Product = {
 }
 
 const REMOTE_IMAGE_URL_PATTERN = /^https?:\/\//i
+const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
 
 function normalizeImagePayload(image: string) {
   const source = String(image || "").trim()
@@ -156,11 +157,27 @@ export default function CanteenOwnerProductsPage() {
     const file = event.target.files?.[0]
     if (!file) return
 
+    if (!file.type.startsWith("image/")) {
+      toast.error("File harus berupa gambar")
+      event.target.value = ""
+      return
+    }
+
+    if (file.size > MAX_IMAGE_SIZE_BYTES) {
+      toast.error("Ukuran gambar maksimal 5MB")
+      event.target.value = ""
+      return
+    }
+
     const reader = new FileReader()
     reader.onload = (loadEvent) => {
       const result = String(loadEvent.target?.result || "")
       if (!result) return
       setFormData((prev) => ({ ...prev, image: result }))
+    }
+    reader.onerror = () => {
+      toast.error("Gagal membaca file gambar")
+      event.target.value = ""
     }
     reader.readAsDataURL(file)
   }

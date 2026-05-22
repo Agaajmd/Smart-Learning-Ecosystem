@@ -1,5 +1,6 @@
 export type UserRole = "STUDENT" | "EMPLOYEE" | "ADMIN" | "SUPER_ADMIN" | "PARENT" | "CANTEEN_OWNER"
 export type PaymentStatus = "PAID" | "UNPAID" | "PARTIAL"
+export type StudentPaymentMethod = "WALLET" | "MANUAL"
 export type AttendanceStatus = "PRESENT" | "SICK" | "ALPHA"
 export type TaskStatus = "PENDING" | "SUBMITTED" | "GRADED" | "LATE"
 export type ReportStatus = "PENDING" | "IN_PROGRESS" | "RESOLVED"
@@ -174,6 +175,8 @@ export interface StudentPayment {
   paidDate?: string
   status: PaymentStatus
   semester: string
+  paidByUserId?: string
+  paidVia?: StudentPaymentMethod
 }
 
 export interface SppDefault {

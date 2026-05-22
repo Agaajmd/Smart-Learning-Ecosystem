@@ -56,6 +56,9 @@ const formatCurrency = (value: number) =>
     maximumFractionDigits: 0,
   }).format(Number(value || 0))
 
+const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024
+const MAX_GENERAL_FILE_SIZE_BYTES = 10 * 1024 * 1024
+
 function getStatusBadge(status: WalletTopupStatus) {
   switch (status) {
     case "APPROVED":
@@ -149,6 +152,18 @@ export function SchoolWalletTopup({ role, renderTrigger }: SchoolWalletTopupProp
       setProofFileName("")
       setProofDataUrl("")
       setProofMimeType("")
+      return
+    }
+
+    if (file.type.startsWith("image/") && file.size > MAX_IMAGE_SIZE_BYTES) {
+      toast.error("Ukuran gambar maksimal 5MB")
+      event.target.value = ""
+      return
+    }
+
+    if (file.size > MAX_GENERAL_FILE_SIZE_BYTES) {
+      toast.error("Ukuran file maksimal 10MB")
+      event.target.value = ""
       return
     }
 
@@ -298,7 +313,7 @@ export function SchoolWalletTopup({ role, renderTrigger }: SchoolWalletTopupProp
                   onChange={handleProofFileChange}
                 />
                 <p className="text-sm font-medium text-slate-700">Klik untuk upload file/foto bukti transfer</p>
-                <p className="text-xs text-slate-500 mt-1">Format umum didukung, maksimal 10MB.</p>
+                <p className="text-xs text-slate-500 mt-1">Gambar maksimal 5MB, file lain maksimal 10MB.</p>
               </label>
 
               {proofDataUrl ? (

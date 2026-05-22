@@ -67,8 +67,15 @@
 - Super Admin bisa CRUD default nominal SPP per grade
 - Parent melihat status SPP bulanan per anak
 - Parent bisa bayar SPP langsung dari halaman keuangan
-- Auto-generate invoice SPP bulanan saat data dibuka (jika default grade tersedia)
+- Tagihan SPP bulanan ditampilkan saat data dibuka tanpa menulis ke sheet
+- Data pembayaran SPP ditulis ke sheet hanya saat ada aksi user (klik bayar)
 - Data tersimpan di sheet `spp_defaults` dan `student_payment`
+
+### 📝 Sistem Tugas Guru
+- Guru mengelola tugas dari halaman Kelola Tugas
+- Tersedia menu titik-3 pada card tugas untuk kirim email massal ke seluruh siswa dalam kelas tugas
+- Isi email otomatis mengikuti data tugas di sheet (judul, deskripsi, tenggat, mapel)
+- Email menyertakan link direct ke halaman tugas siswa (`/student/assignments?taskId=...`)
 
 ### 📅 Sistem Piket Guru
 - Admin bisa CRUD jadwal piket guru per hari
@@ -113,6 +120,13 @@ open https://your-domain.example
 - `GOOGLE_DRIVE_OAUTH_CLIENT_ID` (opsional): OAuth client id untuk upload Drive via akun Google user.
 - `GOOGLE_DRIVE_OAUTH_CLIENT_SECRET` (opsional): OAuth client secret untuk upload Drive via akun Google user.
 - `GOOGLE_DRIVE_OAUTH_REFRESH_TOKEN` (opsional): refresh token akun Google user untuk upload Drive jika tidak memakai Shared Drive.
+- `SMTP_USER` (opsional): email pengirim SMTP/Gmail untuk kirim email tugas siswa.
+- `SMTP_PASS` (opsional): password/app password SMTP/Gmail.
+- `SMTP_FROM` (opsional): alamat From email, default mengikuti `SMTP_USER`.
+- `SMTP_HOST` (opsional): host SMTP, default `smtp.gmail.com`.
+- `SMTP_PORT` (opsional): port SMTP, default `465`.
+- `SMTP_SECURE` (opsional): `true/false`, default otomatis sesuai port.
+- `APP_BASE_URL` (opsional): base URL publik aplikasi untuk membangun link direct tugas di email.
 - Jika memakai OAuth Drive, isi ketiga variabel OAuth di atas sekaligus (all-or-nothing).
 
 ### Google Sheets Data Notes

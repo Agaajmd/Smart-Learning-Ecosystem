@@ -1,7 +1,7 @@
 import "server-only"
 
 import { google } from "googleapis"
-import type { PaymentStatus, StudentPayment } from "@/lib/data-model"
+import type { PaymentStatus, StudentPayment, StudentPaymentMethod } from "@/lib/data-model"
 
 const STUDENT_PAYMENTS_SHEET_PRIMARY_NAME = "student_payment"
 const STUDENT_PAYMENTS_SHEET_CANDIDATES = ["student_payment", "student_payments", "payments"]
@@ -15,6 +15,8 @@ const STUDENT_PAYMENTS_COLUMNS = [
   "paid_date",
   "status",
   "semester",
+  "paid_by_user_id",
+  "paid_via",
   "updated_at",
 ]
 
@@ -132,6 +134,14 @@ function normalizePaymentStatus(value: unknown): PaymentStatus {
   return "UNPAID"
 }
 
+function normalizePaymentMethod(value: unknown): StudentPaymentMethod | undefined {
+  const next = String(value || "").trim().toUpperCase()
+  if (next === "WALLET" || next === "MANUAL") {
+    return next
+  }
+  return undefined
+}
+
 function normalizeStudentPayment(input: StudentPayment): StudentPayment {
   const now = new Date().toISOString()
 
@@ -145,10 +155,16 @@ function normalizeStudentPayment(input: StudentPayment): StudentPayment {
     paidDate: normalizeMaybeString(input.paidDate),
     status: normalizePaymentStatus(input.status),
     semester: String(input.semester || "").trim() || "-",
+    paidByUserId: normalizeMaybeString(input.paidByUserId),
+    paidVia: normalizePaymentMethod(input.paidVia),
   }
 }
 
 function normalizeStudentPaymentRow(row: string[]): StudentPayment {
+  const hasExtendedColumns = row.length >= 11
+  const paidByUserId = hasExtendedColumns ? normalizeMaybeString(row[9]) : undefined
+  const paidVia = normalizePaymentMethod(row.length >= 12 ? row[10] : undefined)
+
   return normalizeStudentPayment({
     id: String(row[0] || "").trim(),
     studentId: String(row[1] || "").trim(),
@@ -159,6 +175,8 @@ function normalizeStudentPaymentRow(row: string[]): StudentPayment {
     paidDate: normalizeMaybeString(row[6]),
     status: normalizePaymentStatus(row[7]),
     semester: String(row[8] || "").trim(),
+    paidByUserId,
+    paidVia,
   })
 }
 
@@ -173,6 +191,8 @@ function toStudentPaymentSheetRow(payment: StudentPayment, updatedAt: string) {
     payment.paidDate || "",
     payment.status,
     payment.semester,
+    payment.paidByUserId || "",
+    payment.paidVia || "",
     updatedAt,
   ]
 }
@@ -188,14 +208,14 @@ async function replaceAllDbStudentPaymentsInSheet(payments: StudentPayment[]) {
 
   await sheets.spreadsheets.values.clear({
     spreadsheetId,
-    range: `${studentPaymentsSheetName}!A2:J`,
+    range: `${studentPaymentsSheetName}!A2:L`,
   })
 
   if (payments.length > 0) {
     const updatedAt = new Date().toISOString()
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `${studentPaymentsSheetName}!A2:J${payments.length + 1}`,
+      range: `${studentPaymentsSheetName}!A2:L${payments.length + 1}`,
       valueInputOption: "RAW",
       requestBody: {
         values: payments.map((payment) => toStudentPaymentSheetRow(payment, updatedAt)),
@@ -246,14 +266,14 @@ export async function ensureStudentPaymentsSheetReady() {
 
   const headerRes = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${studentPaymentsSheetName}!A1:J1`,
+    range: `${studentPaymentsSheetName}!A1:L1`,
   })
 
   const firstRow = headerRes.data.values?.[0] || []
   if (firstRow.length !== STUDENT_PAYMENTS_COLUMNS.length) {
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `${studentPaymentsSheetName}!A1:J1`,
+      range: `${studentPaymentsSheetName}!A1:L1`,
       valueInputOption: "RAW",
       requestBody: {
         values: [STUDENT_PAYMENTS_COLUMNS],
@@ -275,7 +295,7 @@ export async function getAllDbStudentPaymentsFromSheet(): Promise<StudentPayment
 
   const rowsRes = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: `${studentPaymentsSheetName}!A2:J`,
+    range: `${studentPaymentsSheetName}!A2:L`,
   })
 
   const rows = rowsRes.data.values || []
@@ -303,7 +323,7 @@ export async function createDbStudentPayment(input: StudentPayment): Promise<Stu
 
   await sheets.spreadsheets.values.append({
     spreadsheetId,
-    range: `${studentPaymentsSheetName}!A1:J1`,
+    range: `${studentPaymentsSheetName}!A1:L1`,
     valueInputOption: "RAW",
     requestBody: {
       values: [toStudentPaymentSheetRow(next, new Date().toISOString())],
@@ -377,7 +397,7 @@ export async function migrateDbStudentPaymentsToSheet(sourcePayments: StudentPay
 
   await sheets.spreadsheets.values.append({
     spreadsheetId,
-    range: `${studentPaymentsSheetName}!A1:J1`,
+    range: `${studentPaymentsSheetName}!A1:L1`,
     valueInputOption: "RAW",
     requestBody: {
       values: missing.map((payment) => toStudentPaymentSheetRow(payment, updatedAt)),
@@ -388,7 +408,10 @@ export async function migrateDbStudentPaymentsToSheet(sourcePayments: StudentPay
   return getAllDbStudentPaymentsFromSheet()
 }
 
-export async function loadDbStudentPaymentsWithMigration(localPayments: StudentPayment[]) {
+export async function loadDbStudentPaymentsWithMigration(
+  localPayments: StudentPayment[],
+  options?: { migrateOnEmpty?: boolean },
+) {
   try {
     const fromSheet = await getAllDbStudentPaymentsFromSheet()
     if (fromSheet.length > 0) {
@@ -396,6 +419,10 @@ export async function loadDbStudentPaymentsWithMigration(localPayments: StudentP
     }
 
     if (!Array.isArray(localPayments) || localPayments.length === 0) {
+      return fromSheet
+    }
+
+    if (!options?.migrateOnEmpty) {
       return fromSheet
     }
 

@@ -384,7 +384,10 @@ export async function migrateDbSppDefaultsToSheet(sourceDefaults: SppDefault[]) 
   return getAllDbSppDefaultsFromSheet()
 }
 
-export async function loadDbSppDefaultsWithMigration(localDefaults: SppDefault[]) {
+export async function loadDbSppDefaultsWithMigration(
+  localDefaults: SppDefault[],
+  options?: { migrateOnEmpty?: boolean },
+) {
   try {
     const fromSheet = await getAllDbSppDefaultsFromSheet()
     if (fromSheet.length > 0) {
@@ -392,6 +395,10 @@ export async function loadDbSppDefaultsWithMigration(localDefaults: SppDefault[]
     }
 
     if (!Array.isArray(localDefaults) || localDefaults.length === 0) {
+      return fromSheet
+    }
+
+    if (!options?.migrateOnEmpty) {
       return fromSheet
     }
 

@@ -16,6 +16,12 @@ import {
   setDbAuditLogs,
 } from "@/lib/server/persistent-store"
 
+function getCurrentPeriodKey(date = new Date()) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  return `${year}-${month}`
+}
+
 async function loadPaymentsFromSheetOrStore() {
   return loadDbStudentPaymentsWithMigration(getDbPayments())
 }
@@ -46,6 +52,7 @@ export async function GET() {
   const paymentsByMonth = new Map<string, { income: number; expenses: number }>()
   const payments = await loadPaymentsFromSheetOrStore()
   const orders = getDbOrders()
+  const completedOrders = orders.filter((order) => order.status === "COMPLETED")
   const grades = getDbGrades()
   const attendance = getDbAttendance()
   const teachers = getDbTeachers()
@@ -61,7 +68,7 @@ export async function GET() {
     paymentsByMonth.set(month, current)
   })
 
-  orders.forEach((order) => {
+  completedOrders.forEach((order) => {
     const month = String(order.createdAt || "").slice(0, 7) || "unknown"
     const current = paymentsByMonth.get(month) || { income: 0, expenses: 0 }
     current.income += Number(order.totalAmount || 0)
@@ -89,8 +96,54 @@ export async function GET() {
     teachers.length > 0
       ? toPercent((teachers.reduce((acc, teacher) => acc + Number(teacher.rating || 0), 0) / teachers.length) * 20)
       : 0
-  const paidCount = payments.filter((item) => item.status === "PAID").length
-  const parentSatisfaction = payments.length > 0 ? toPercent((paidCount / payments.length) * 100) : 0
+
+  const studentUsers = users.filter((user) => user.role === "STUDENT" && user.isActive)
+  const currentPeriodKey = getCurrentPeriodKey()
+  const latestPaymentByStudentId = new Map<string, (typeof payments)[number]>()
+  const sortedSppPayments = payments
+    .filter((item) => item.type === "SPP")
+    .sort((left, right) => {
+      const leftSemester = String(left.semester || "")
+      const rightSemester = String(right.semester || "")
+      if (leftSemester !== rightSemester) {
+        return rightSemester.localeCompare(leftSemester)
+      }
+      return String(right.dueDate || "").localeCompare(String(left.dueDate || ""))
+    })
+
+  for (const payment of sortedSppPayments) {
+    if (!latestPaymentByStudentId.has(payment.studentId)) {
+      latestPaymentByStudentId.set(payment.studentId, payment)
+    }
+  }
+
+  const sortedCompletedOrders = [...completedOrders].sort((left, right) =>
+    String(right.createdAt || "").localeCompare(String(left.createdAt || "")),
+  )
+  const sortedPayments = [...payments].sort((left, right) =>
+    String(right.dueDate || "").localeCompare(String(left.dueDate || "")),
+  )
+
+  const studentsWithPaymentStatus = studentUsers.map((student) => {
+    const currentSpp = payments.find(
+      (item) =>
+        item.studentId === student.id &&
+        item.type === "SPP" &&
+        item.semester === currentPeriodKey,
+    )
+
+    const latestSpp = latestPaymentByStudentId.get(student.id)
+    return {
+      ...student,
+      paymentStatus: currentSpp?.status || latestSpp?.status || "UNPAID",
+    }
+  })
+
+  const paidCount = studentsWithPaymentStatus.filter((item) => item.paymentStatus === "PAID").length
+  const parentSatisfaction =
+    studentsWithPaymentStatus.length > 0
+      ? toPercent((paidCount / studentsWithPaymentStatus.length) * 100)
+      : 0
 
   const schoolPerformance = {
     academicScore,
@@ -98,6 +151,26 @@ export async function GET() {
     teacherPerformance,
     parentSatisfaction,
   }
+
+  const teacherProfiles = getDbTeachers()
+  const teacherProfileById = new Map(teacherProfiles.map((item) => [item.id, item]))
+  const employeesFromUsers = users
+    .filter((user) => user.role === "EMPLOYEE" && user.isActive)
+    .map((user) => {
+      const profile = teacherProfileById.get(user.id)
+      return {
+        ...user,
+        subject: profile?.subject || user.subject || "-",
+        rating: Number(profile?.rating || 0),
+        classesCount: Number(profile?.classesCount || 0),
+      }
+    })
+
+  const existingEmployeeIds = new Set(employeesFromUsers.map((item) => item.id))
+  const mergedEmployees = [
+    ...employeesFromUsers,
+    ...teacherProfiles.filter((teacher) => !existingEmployeeIds.has(teacher.id)),
+  ]
 
   const announcements = [
     ...tasks
@@ -124,26 +197,23 @@ export async function GET() {
 
   const recentActivities = [
     ...auditLogs
-      .slice(-2)
-      .reverse()
+      .slice(0, 2)
       .map((log, index) => ({
         id: index + 1,
         action: `${log.entityName} di-${log.action.toLowerCase()}`,
         time: formatRelative(log.createdAt),
         type: "staff",
       })),
-    ...orders
-      .slice(-1)
-      .reverse()
+    ...sortedCompletedOrders
+      .slice(0, 1)
       .map((order, index) => ({
         id: index + 11,
         action: `Pesanan kantin ${order.id} berstatus ${order.status.toLowerCase()}`,
         time: formatRelative(order.createdAt),
         type: "finance",
       })),
-    ...payments
-      .slice(-1)
-      .reverse()
+    ...sortedPayments
+      .slice(0, 1)
       .map((payment, index) => ({
         id: index + 21,
         action: `Pembayaran ${payment.type} ${payment.status.toLowerCase()}`,
@@ -154,12 +224,13 @@ export async function GET() {
 
   const expenseSource = new Map<string, number>()
   for (const payment of payments) {
+    if (payment.status !== "PAID") continue
     const key = payment.type
     expenseSource.set(key, (expenseSource.get(key) || 0) + Number(payment.amount || 0))
   }
   expenseSource.set(
     "Kantin",
-    orders.reduce((acc, order) => acc + Number(order.totalAmount || 0), 0),
+    completedOrders.reduce((acc, order) => acc + Number(order.totalAmount || 0), 0),
   )
   const totalBreakdown = [...expenseSource.values()].reduce((acc, value) => acc + value, 0)
   const expenseBreakdown = [...expenseSource.entries()].map(([category, amount]) => ({
@@ -179,12 +250,18 @@ export async function GET() {
   return NextResponse.json({
     superAdmin,
     financialData,
-    employees: users.filter((user) => user.role === "EMPLOYEE" && user.isActive),
-    students: users.filter((user) => user.role === "STUDENT" && user.isActive),
+    employees: mergedEmployees,
+    students: studentsWithPaymentStatus,
     classes: getDbClasses(),
     schoolPerformance,
     announcements,
     recentActivities,
     expenseBreakdown,
+    paymentSummary: {
+      paid: studentsWithPaymentStatus.filter((item) => item.paymentStatus === "PAID").length,
+      unpaid: studentsWithPaymentStatus.filter((item) => item.paymentStatus === "UNPAID").length,
+      partial: studentsWithPaymentStatus.filter((item) => item.paymentStatus === "PARTIAL").length,
+      totalStudents: studentsWithPaymentStatus.length,
+    },
   })
 }

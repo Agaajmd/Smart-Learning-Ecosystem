@@ -6,13 +6,14 @@ import { getAllDbSchedules } from "@/lib/server/google-sheets-schedules"
 import { getAllDbGradesFromSheet } from "@/lib/server/google-sheets-grades"
 import { getAllDbAttendanceRecords } from "@/lib/server/google-sheets-attendance"
 import { loadDbSppDefaultsWithMigration } from "@/lib/server/google-sheets-spp-defaults"
-import { createDbStudentPayment, loadDbStudentPaymentsWithMigration } from "@/lib/server/google-sheets-student-payments"
+import { loadDbStudentPaymentsWithMigration } from "@/lib/server/google-sheets-student-payments"
 import { loadDbPiketSchedulesWithMigration } from "@/lib/server/google-sheets-piket-schedules"
 import { loadDbParentChildLinksWithMigration } from "@/lib/server/google-sheets-parent-children"
 import { getSessionUser } from "@/lib/server/session-user"
 import { createClassIdResolver } from "@/lib/server/class-id-resolver"
 import { resolveParentChildIds } from "@/lib/server/parent-child-links"
 import { normalizeDriveMediaUrl } from "@/lib/google-drive"
+import { calculateWalletSnapshot } from "@/lib/server/wallet-balance"
 import {
   getDbAttendance,
   getDbClasses,
@@ -23,7 +24,6 @@ import {
   getDbSppDefaults,
   getDbSchedules,
   getDbStudents,
-  setDbPayments,
   setDbPiketSchedules,
   setDbSppDefaults,
 } from "@/lib/server/persistent-store"
@@ -282,7 +282,7 @@ export async function GET(request: Request) {
   const allGrades = await loadGrades()
   const sppDefaults = await loadDbSppDefaultsWithMigration(getDbSppDefaults())
   setDbSppDefaults(sppDefaults)
-  let allPayments = await loadDbStudentPaymentsWithMigration(getDbPayments())
+  const allPayments = await loadDbStudentPaymentsWithMigration(getDbPayments())
   const teacherNameById = new Map(teacherUsers.map((teacher) => [teacher.id, teacher.name]))
   const grades = selectedChild
     ? allGrades
@@ -318,34 +318,37 @@ export async function GET(request: Request) {
       ) || null
     : null
 
-  if (selectedChild && currentSppDefault && !currentSppPayment) {
-    try {
-      const createdSppPayment = await createDbStudentPayment({
-        id: `pay-spp-${selectedChild.id}-${Date.now()}`,
-        studentId: selectedChild.id,
-        type: "SPP",
-        description: buildSppDescription(selectedGrade),
-        amount: currentSppDefault.amount,
-        dueDate: buildDueDate(currentPeriodKey, currentSppDefault.dueDay),
-        paidDate: undefined,
-        status: "UNPAID",
-        semester: currentPeriodKey,
-      })
+  const virtualCurrentSppPayment =
+    selectedChild && currentSppDefault && !currentSppPayment
+      ? {
+          id: `virtual-spp-${selectedChild.id}-${currentPeriodKey}`,
+          studentId: selectedChild.id,
+          type: "SPP" as const,
+          description: buildSppDescription(selectedGrade),
+          amount: currentSppDefault.amount,
+          dueDate: buildDueDate(currentPeriodKey, currentSppDefault.dueDay),
+          paidDate: undefined,
+          status: "UNPAID" as const,
+          semester: currentPeriodKey,
+        }
+      : null
 
-      allPayments = [...allPayments, createdSppPayment]
-      setDbPayments(allPayments)
-      currentSppPayment = createdSppPayment
-    } catch {
-      // Keep API responsive even if creating automatic SPP invoice fails.
-    }
+  const payments = selectedChild
+    ? [
+        ...allPayments.filter((item) => item.studentId === selectedChild.id),
+        ...(virtualCurrentSppPayment ? [virtualCurrentSppPayment] : []),
+      ]
+    : []
+
+  if (!currentSppPayment && virtualCurrentSppPayment) {
+    currentSppPayment = virtualCurrentSppPayment
   }
 
-  const payments = selectedChild ? allPayments.filter((item) => item.studentId === selectedChild.id) : []
   const sppInfo = selectedChild
     ? {
         grade: selectedGrade || "-",
         isConfigured: Boolean(currentSppDefault),
-        amount: currentSppDefault?.amount || 0,
+        amount: currentSppPayment?.amount || currentSppDefault?.amount || 0,
         dueDay: currentSppDefault?.dueDay || null,
         status: currentSppPayment?.status || (currentSppDefault ? "UNPAID" : "UNCONFIGURED"),
         paymentId: currentSppPayment?.id || null,
@@ -363,8 +366,11 @@ export async function GET(request: Request) {
     childrenIds: childIds,
   }
 
+  const walletInfo = await calculateWalletSnapshot(parentUser.id)
+
   return NextResponse.json({
     parent,
+    walletInfo,
     children: childrenWithPoints,
     selectedChild: selectedChildWithPoints,
     childClass,
